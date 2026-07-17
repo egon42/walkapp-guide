@@ -1,0 +1,1340 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Build a Walking-Paths App — A Go + SQLite + React Training Guide</title>
+<style>
+  :root{
+    --bg:#f6f4ee; --ink:#22271f; --muted:#5f6b58; --paper:#fffdf8; --line:#e2ddd0;
+    --accent:#3f7d4e; --accent-ink:#2c5c39; --on-accent:#f4fbf3;
+    --code-bg:#f0ede4; --code-ink:#2a2f24;
+    --info:#2e6a8e; --info-bg:#e9f2f7;
+    --warn:#a4442b; --warn-bg:#fbeae4;
+    --decide:#6b4a8a; --decide-bg:#f1ebf6;
+    --try:#3f7d4e; --try-bg:#e8f3e9;
+    --older:#8a6d2f; --older-bg:#f6efdd;
+    --radius:14px;
+    --maxw:70ch;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#12140f; --ink:#eef0e8; --muted:#9aa591; --paper:#191c15; --line:#2e332a;
+      --accent:#6bbd78; --accent-ink:#8fd39a; --on-accent:#0a140c;
+      --code-bg:#1e221a; --code-ink:#d7dccf;
+      --info:#7fbfe0; --info-bg:#15242e;
+      --warn:#e8a08c; --warn-bg:#2e1a14;
+      --decide:#c3a6df; --decide-bg:#231a2e;
+      --try:#7fce8c; --try-bg:#14241a;
+      --older:#d9bd72; --older-bg:#241f11;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#12140f; --ink:#eef0e8; --muted:#9aa591; --paper:#191c15; --line:#2e332a;
+    --accent:#6bbd78; --accent-ink:#8fd39a; --on-accent:#0a140c;
+    --code-bg:#1e221a; --code-ink:#d7dccf;
+    --info:#7fbfe0; --info-bg:#15242e; --warn:#e8a08c; --warn-bg:#2e1a14;
+    --decide:#c3a6df; --decide-bg:#231a2e; --try:#7fce8c; --try-bg:#14241a;
+    --older:#d9bd72; --older-bg:#241f11;
+  }
+  :root[data-theme="light"]{
+    --bg:#f6f4ee; --ink:#22271f; --muted:#5f6b58; --paper:#fffdf8; --line:#e2ddd0;
+    --accent:#3f7d4e; --accent-ink:#2c5c39; --on-accent:#f4fbf3;
+    --code-bg:#f0ede4; --code-ink:#2a2f24;
+    --info:#2e6a8e; --info-bg:#e9f2f7; --warn:#a4442b; --warn-bg:#fbeae4;
+    --decide:#6b4a8a; --decide-bg:#f1ebf6; --try:#3f7d4e; --try-bg:#e8f3e9;
+    --older:#8a6d2f; --older-bg:#f6efdd;
+  }
+
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font:400 1.06rem/1.7 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1200px; margin:0 auto; padding:0 clamp(1rem,4vw,2.5rem)}
+  .layout{display:grid; grid-template-columns:1fr; gap:2.5rem}
+  @media (min-width:1000px){ .layout{grid-template-columns:250px 1fr} }
+
+  /* ---- header ---- */
+  header.hero{padding:clamp(2.5rem,7vw,5rem) 0 2rem}
+  .eyebrow{
+    text-transform:uppercase; letter-spacing:.14em; font-size:.72rem;
+    font-weight:700; color:var(--accent-ink); margin:0 0 .8rem
+  }
+  h1{
+    font-size:clamp(2rem,5.5vw,3.4rem); line-height:1.05; letter-spacing:-.02em;
+    margin:0 0 1rem; max-width:20ch;
+  }
+  .lede{font-size:clamp(1.05rem,2.2vw,1.28rem); color:var(--muted); max-width:60ch; margin:0}
+
+  /* ---- theme toggle ---- */
+  .toggle{
+    position:fixed; top:.9rem; right:.9rem; z-index:50;
+    background:var(--paper); color:var(--ink); border:1px solid var(--line);
+    border-radius:999px; padding:.45rem .85rem; font-size:.82rem; font-weight:650;
+    cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.08);
+  }
+
+  /* ---- sidebar nav ---- */
+  nav.toc{align-self:start}
+  @media (min-width:1000px){ nav.toc{position:sticky; top:1rem; max-height:calc(100vh - 2rem); overflow-y:auto} }
+  nav.toc .toc-inner{background:var(--paper); border:1px solid var(--line); border-radius:var(--radius); padding:1rem 1.1rem}
+  nav.toc details{margin:0}
+  nav.toc summary{font-weight:750; cursor:pointer; list-style:none}
+  nav.toc summary::-webkit-details-marker{display:none}
+  nav.toc h4{margin:1rem 0 .4rem; font-size:.7rem; text-transform:uppercase; letter-spacing:.12em; color:var(--accent-ink)}
+  nav.toc h4:first-of-type{margin-top:.8rem}
+  nav.toc a{display:block; color:var(--muted); text-decoration:none; padding:.22rem 0; font-size:.92rem; line-height:1.35}
+  nav.toc a:hover{color:var(--accent-ink)}
+  @media (min-width:1000px){ nav.toc summary{display:none} nav.toc .toc-inner{padding-top:.4rem} }
+
+  /* ---- sections / phases ---- */
+  .phase{margin:3.2rem 0 1rem; padding-top:1rem}
+  .phase-tag{
+    display:inline-block; background:var(--accent); color:var(--on-accent);
+    font-size:.72rem; font-weight:750; letter-spacing:.08em; text-transform:uppercase;
+    padding:.3rem .7rem; border-radius:999px; margin-bottom:.6rem;
+  }
+  .phase h2{font-size:clamp(1.5rem,3.5vw,2.1rem); margin:.2rem 0 .3rem; letter-spacing:-.01em}
+  .phase > p{color:var(--muted); margin:.2rem 0 0; max-width:var(--maxw)}
+
+  /* ---- unit cards ---- */
+  .unit{
+    background:var(--paper); border:1px solid var(--line); border-radius:var(--radius);
+    padding:1.5rem clamp(1.1rem,3vw,1.8rem); margin:1.4rem 0;
+  }
+  .unit-head{display:flex; align-items:center; gap:.8rem; margin-bottom:.4rem; flex-wrap:wrap}
+  .unit-num{
+    flex:none; width:2.1rem; height:2.1rem; border-radius:50%;
+    background:var(--accent); color:var(--on-accent);
+    display:grid; place-items:center; font-weight:750; font-size:.95rem;
+  }
+  .unit-head h3{margin:0; font-size:1.3rem; letter-spacing:-.01em; flex:1 1 auto; min-width:12ch}
+  .markers{font-size:1rem; letter-spacing:.08em; white-space:nowrap}
+  .oneline{
+    background:var(--code-bg); border-radius:10px; padding:.6rem .9rem;
+    margin:.6rem 0 1rem; font-size:.98rem;
+  }
+  .oneline strong{color:var(--accent-ink)}
+  .goal{margin:.3rem 0 1rem; font-weight:600}
+  p, li{max-width:var(--maxw)}
+  .unit p{margin:.7rem 0}
+  ul,ol{margin:.7rem 0; padding-left:1.3rem}
+  li{margin:.4rem 0}
+  li strong{color:var(--ink)}
+  h5{margin:1.4rem 0 .3rem; font-size:.78rem; text-transform:uppercase; letter-spacing:.1em; color:var(--muted)}
+
+  /* ---- code ---- */
+  pre{
+    background:var(--code-bg); color:var(--code-ink); border-radius:10px;
+    padding:.9rem 1rem; overflow-x:auto; font-size:.9rem; line-height:1.55;
+    margin:.8rem 0; border:1px solid var(--line);
+  }
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:.9em}
+  :not(pre) > code{background:var(--code-bg); padding:.12em .4em; border-radius:5px; color:var(--code-ink)}
+
+  /* ---- callouts ---- */
+  .callout{
+    border-left:4px solid var(--info); background:var(--info-bg);
+    border-radius:0 10px 10px 0; padding:.85rem 1.05rem; margin:1rem 0;
+  }
+  .callout .tag{
+    display:inline-block; font-size:.68rem; font-weight:750; letter-spacing:.09em;
+    text-transform:uppercase; margin-bottom:.35rem; color:var(--info);
+  }
+  .callout p:first-of-type{margin-top:0}
+  .callout p:last-child, .callout ul:last-child, .callout ol:last-child{margin-bottom:0}
+
+  .callout.concept{border-color:var(--info); background:var(--info-bg)}
+  .callout.concept .tag{color:var(--info)}
+  .callout.decision{border-color:var(--decide); background:var(--decide-bg)}
+  .callout.decision .tag{color:var(--decide)}
+  .callout.try{border-color:var(--try); background:var(--try-bg)}
+  .callout.try .tag{color:var(--try)}
+  .callout.older{border-color:var(--older); background:var(--older-bg)}
+  .callout.older .tag{color:var(--older)}
+
+  /* critical — the "don't skim" treatment */
+  .callout.critical{
+    border:2px solid var(--warn); border-left-width:6px; background:var(--warn-bg);
+    border-radius:10px; padding:1rem 1.1rem;
+  }
+  .callout.critical .tag{color:var(--warn); font-size:.74rem}
+  .callout.critical strong{color:var(--warn)}
+
+  /* collapsible why */
+  details.why{margin:1rem 0; border:1px dashed var(--line); border-radius:10px; padding:.2rem .9rem; background:transparent}
+  details.why > summary{
+    cursor:pointer; font-weight:650; color:var(--accent-ink); padding:.5rem 0;
+    font-size:.95rem; list-style:none;
+  }
+  details.why > summary::before{content:"▸ "; color:var(--accent)}
+  details.why[open] > summary::before{content:"▾ "}
+  details.why > summary::-webkit-details-marker{display:none}
+  details.why > *:not(summary){margin-bottom:.7rem}
+
+  /* checklist */
+  .check{list-style:none; padding-left:0}
+  .check li{position:relative; padding-left:1.9rem}
+  .check li::before{
+    content:""; position:absolute; left:0; top:.32em; width:1.05rem; height:1.05rem;
+    border:2px solid var(--accent); border-radius:5px;
+  }
+
+  /* diverge note */
+  .diverge{font-size:.95rem; color:var(--muted); border-top:1px solid var(--line); margin-top:1.2rem; padding-top:.9rem}
+  .diverge strong{color:var(--accent-ink)}
+  .ends{
+    margin-top:1.2rem; padding-top:.9rem; border-top:1px solid var(--line);
+    font-size:.95rem;
+  }
+  .ends strong{color:var(--accent-ink)}
+
+  /* legend + tables */
+  .panel{background:var(--paper); border:1px solid var(--line); border-radius:var(--radius); padding:1.4rem clamp(1.1rem,3vw,1.8rem); margin:1.4rem 0}
+  .legend{display:grid; gap:.6rem; grid-template-columns:1fr; margin:.8rem 0 0}
+  @media(min-width:560px){ .legend{grid-template-columns:1fr 1fr} }
+  .legend div{display:flex; gap:.6rem; align-items:baseline}
+  .legend .mk{font-size:1.15rem; flex:none; width:1.6rem; text-align:center}
+  table{width:100%; border-collapse:collapse; margin:1rem 0; font-size:.94rem; display:block; overflow-x:auto}
+  th,td{text-align:left; padding:.55rem .7rem; border-bottom:1px solid var(--line); vertical-align:top}
+  th{font-size:.72rem; text-transform:uppercase; letter-spacing:.08em; color:var(--muted)}
+  tbody tr:hover{background:var(--code-bg)}
+
+  .grid2{display:grid; gap:1rem; grid-template-columns:1fr}
+  @media(min-width:640px){ .grid2{grid-template-columns:1fr 1fr} }
+  .mini{background:var(--code-bg); border-radius:10px; padding:.9rem 1rem}
+  .mini h4{margin:0 0 .4rem; font-size:.95rem; color:var(--accent-ink)}
+  .mini p{margin:0; font-size:.92rem; color:var(--muted); max-width:none}
+
+  a.top{display:inline-block; margin-top:.6rem; font-size:.85rem; color:var(--accent-ink); text-decoration:none}
+  footer{color:var(--muted); font-size:.9rem; border-top:1px solid var(--line); margin-top:3rem; padding:1.6rem 0 3rem}
+  hr.soft{border:none; border-top:1px solid var(--line); margin:2rem 0}
+  .pill{display:inline-block; background:var(--code-bg); border-radius:999px; padding:.15rem .6rem; font-size:.8rem; font-weight:600; color:var(--accent-ink); margin:.1rem .2rem .1rem 0}
+</style>
+</head>
+<body>
+<button class="toggle" id="themeToggle" aria-label="Toggle light or dark theme">◐ Theme</button>
+
+<div class="wrap">
+  <header class="hero">
+    <p class="eyebrow">A hands-on training project</p>
+    <h1>Build a Walking-Paths App</h1>
+    <p class="lede">A start-from-scratch course in Go, SQLite, and React — learned by building one real, useful thing. No prior experience with any of the three is assumed.</p>
+  </header>
+
+  <div class="layout">
+    <!-- SIDEBAR -->
+    <nav class="toc">
+      <div class="toc-inner">
+        <details open>
+          <summary>Contents</summary>
+          <h4>Start here</h4>
+          <a href="#how">How to use this guide</a>
+          <a href="#pairing">Working with a partner</a>
+          <a href="#what">What you're building</a>
+          <a href="#stack">The stack</a>
+          <h4>Phase 0 · Setup</h4>
+          <a href="#u0">0 · Tools</a>
+          <a href="#u1">1 · Git &amp; GitHub</a>
+          <a href="#u2">2 · Go, part 1</a>
+          <h4>Phase 1 · Data</h4>
+          <a href="#u3">3 · Schema design</a>
+          <a href="#u4">4 · SQL, hands-on</a>
+          <a href="#u5">5 · Go, part 2</a>
+          <a href="#u6">6 · Go + SQLite</a>
+          <a href="#u7">7 · When it breaks</a>
+          <a href="#u8">8 · Migrations</a>
+          <h4>Phase 2 · API</h4>
+          <a href="#u9">9 · HTTP server</a>
+          <a href="#u10">10 · Read API</a>
+          <a href="#u11">11 · Write API</a>
+          <a href="#u12">12 · Update API</a>
+          <a href="#u13">13 · Hardening</a>
+          <a href="#u14">14 · Tests</a>
+          <h4>Phase 3 · The face</h4>
+          <a href="#u15">15 · UI scaffold</a>
+          <a href="#u16">16 · Wiring it up</a>
+          <a href="#u17">17 · Tags &amp; walks</a>
+          <h4>Phase 4 · The idea</h4>
+          <a href="#u18">18 · Weather API</a>
+          <a href="#u19">19 · Suggestions</a>
+          <a href="#u20">20 · Suggestion UI</a>
+          <h4>Phase 5 · Ship it</h4>
+          <a href="#u21">21 · One binary</a>
+          <a href="#u22">22 · CI &amp; deploy</a>
+          <a href="#u23">23 · Project memory</a>
+          <h4>Reference</h4>
+          <a href="#map">Course map</a>
+          <a href="#older">From an older language</a>
+          <a href="#later">What comes later</a>
+        </details>
+      </div>
+    </nav>
+
+    <!-- MAIN -->
+    <main>
+
+      <!-- HOW TO USE -->
+      <section class="panel" id="how">
+        <p class="eyebrow" style="margin-bottom:.4rem">Read this first</p>
+        <h2 style="margin:.1rem 0 .6rem; font-size:1.5rem">How to use this guide</h2>
+        <p><strong>This guide is built to be skimmed.</strong> The colored boxes carry the details that actually matter — if you read nothing else on a page, read the boxes.</p>
+
+        <div class="grid2" style="margin-top:1rem">
+          <div class="mini"><h4>🎯 Goal</h4><p>What you can do by the end of the unit.</p></div>
+          <div class="mini"><h4>🧠 Learn this</h4><p>A concept to genuinely understand, not just type.</p></div>
+          <div class="mini"><h4>🔑 Decision</h4><p>A choice that's expensive to reverse later. Make it on purpose.</p></div>
+          <div class="mini"><h4>⚠️ Don't skim past this</h4><p>A specific detail that will cost you an evening if you miss it. These are rare, so when you see one, stop.</p></div>
+          <div class="mini"><h4>✅ Try it</h4><p>Something to actually do, right now, to make an idea concrete.</p></div>
+          <div class="mini"><h4>▸ Why (collapsible)</h4><p>The deeper reasoning, tucked away. Open it when you're curious; skip it when you're moving.</p></div>
+        </div>
+
+        <h5>Difficulty markers</h5>
+        <div class="legend">
+          <div><span class="mk">🧱</span><span><strong>Foundation.</strong> Slow down. Everything later assumes it.</span></div>
+          <div><span class="mk">🔍</span><span><strong>Hard-to-reverse decision.</strong> Think before you commit.</span></div>
+          <div><span class="mk">🎁</span><span><strong>Payoff.</strong> The app visibly gets better.</span></div>
+          <div><span class="mk">🌉</span><span><strong>Bridge.</strong> Two things built separately now connect.</span></div>
+        </div>
+
+        <div class="callout" style="margin-top:1.3rem">
+          <span class="tag">The one rule</span>
+          <p>Every unit ends with the app still running, and with a commit. No exceptions. The habits only build through repetition.</p>
+        </div>
+
+        <div class="callout critical">
+          <span class="tag">⚠️ No throwaway exercises</span>
+          <p><strong>Everything you build accrues to the app.</strong> There is no "learn it in a sandbox, then start the real thing" — the first Go you write is the app's real domain code, and the first SQL you write is the app's real schema. Each unit's practice <em>is</em> a piece of the walking app, so nothing is wasted and every session leaves the product further along.</p>
+        </div>
+      </section>
+
+      <!-- PAIRING -->
+      <section class="panel" id="pairing">
+        <h2 style="margin:.1rem 0 .6rem; font-size:1.5rem">Working with a partner <span style="font-size:.8rem; color:var(--muted); font-weight:400">(optional)</span></h2>
+        <p>You can do this solo. But it works beautifully as a two-person project, and a few habits make pairing pay off instead of turning into one person typing while the other watches.</p>
+        <ul>
+          <li><strong>Driver / navigator.</strong> One person types, the other reads every line aloud and questions it. The person <em>explaining</em> the code usually learns it more deeply than the person typing.</li>
+          <li><strong>Rotate the keyboard every 25 minutes.</strong> Hard stop, even mid-function. This is the single thing that stops the roles calcifying into "typist" and "audience."</li>
+          <li><strong>Split the work at an interface.</strong> From the API phase on, one person can own the data layer (the store, the SQL) and the other the HTTP handlers. They meet at a shared interface — which is the whole point of designing one.</li>
+          <li><strong>Write the tests for each other's code.</strong> Writing a test for a function someone else wrote is the highest-comprehension reading exercise there is.</li>
+          <li><strong>Do a couple of units solo, as pull requests.</strong> The UI scaffold and the weather client touch nothing else, so they're ideal to build alone on a branch and have the other person review — a real review, of code they didn't watch appear.</li>
+        </ul>
+        <div class="callout critical">
+          <span class="tag">⚠️ Don't skim past this</span>
+          <p><strong>The AI rule.</strong> You will paste compile errors into an AI assistant. That's fine — as a tool for <em>explaining</em> an error or <em>reviewing</em> code you wrote. Never let it type the code for you. The entire value of this course is your own hands on the keys building the mental model. Outsource that and you finish with an app and no skill.</p>
+        </div>
+      </section>
+
+      <!-- WHAT -->
+      <section class="panel" id="what">
+        <h2 style="margin:.1rem 0 .6rem; font-size:1.5rem">What you're building</h2>
+        <p>A tool for cataloguing walking paths by what they're <em>good for</em> — shade, garbage cans, closed loops, parking, dog-friendliness — that then suggests where to walk today based on your mood, the weather, and your criteria.</p>
+        <p>Technically, it's a <strong>single program</strong> that:</p>
+        <ul>
+          <li>serves a web UI (compiled right into the program)</li>
+          <li>exposes a JSON API</li>
+          <li>stores everything in one database file beside it</li>
+          <li>calls a weather service to inform its suggestions</li>
+        </ul>
+        <p>You run it by double-clicking one file. That single-binary simplicity is much of why this stack was chosen.</p>
+
+        <div class="grid2">
+          <div class="mini"><h4>In scope</h4><p>Paths entered by hand, tagged, browsable, plus a suggestion engine answering "where should I walk today?"</p></div>
+          <div class="mini"><h4>Deferred, but designed for</h4><p>Drawing paths on a map, and recording a walk from a phone's GPS. Sketched at the end.</p></div>
+        </div>
+
+        <div class="callout decision">
+          <span class="tag">🔑 The decision that protects your future</span>
+          <p>The database stores real latitude/longitude geometry <strong>from the very first schema</strong>, and an early unit builds the form that collects it. Those two facts go together. Typing a couple of coordinates by hand now is tedious — but it's what makes adding a map later <em>additive</em> instead of a re-entry of every path you own.</p>
+        </div>
+      </section>
+
+      <!-- STACK -->
+      <section class="panel" id="stack">
+        <h2 style="margin:.1rem 0 .6rem; font-size:1.5rem">The stack, and why</h2>
+        <table>
+          <thead><tr><th>Layer</th><th>Choice</th><th>Why</th></tr></thead>
+          <tbody>
+            <tr><td>Backend</td><td>Go</td><td>One static binary, no runtime to install, excellent standard library.</td></tr>
+            <tr><td>HTTP</td><td><code>net/http</code>, no framework</td><td>Modern Go routes method + path natively. Learn the real thing.</td></tr>
+            <tr><td>Database</td><td>SQLite</td><td>Zero setup, one file, backed up by copying it.</td></tr>
+            <tr><td>DB access</td><td><code>database/sql</code>, hand-written SQL</td><td>No ORM. An ORM hides exactly what a database course is meant to teach.</td></tr>
+            <tr><td>Driver</td><td><code>modernc.org/sqlite</code> 🔍</td><td>Pure Go, no C compiler needed. See Unit&nbsp;6.</td></tr>
+            <tr><td>Frontend</td><td>React + Vite + TypeScript</td><td>A widely used, well-documented modern web stack.</td></tr>
+            <tr><td>Styling</td><td>Hand-written CSS, ~12 custom properties</td><td>A tiny, legible design system you fully control.</td></tr>
+            <tr><td>Weather</td><td>Open-Meteo</td><td>Free, no key, no signup, no billing.</td></tr>
+            <tr><td>Hosting</td><td>Single binary; deploy optional</td><td>Runs locally first.</td></tr>
+          </tbody>
+        </table>
+        <a class="top" href="#how">↑ back to top</a>
+      </section>
+
+      <!-- ============ PHASE 0 ============ -->
+      <div class="phase" id="phase0">
+        <span class="phase-tag">Phase 0</span>
+        <h2>Bare machine to first commit</h2>
+        <p>Assume nothing is installed.</p>
+      </div>
+
+      <!-- UNIT 0 -->
+      <section class="unit" id="u0">
+        <div class="unit-head"><span class="unit-num">0</span><h3>Tools</h3><span class="markers">🧱</span></div>
+        <p class="oneline"><strong>In one line:</strong> Get the machine able to compile Go, run Node, use Git, and open an editor — and prove each one works before moving on.</p>
+        <p class="goal">🎯 <strong>Goal:</strong> A verified toolchain.</p>
+
+        <p>On Windows, install everything via <code>winget</code> (it ships with Windows 11). Run these one at a time, reading each one's output:</p>
+        <pre><code>winget install GoLang.Go
+winget install Git.Git
+winget install Microsoft.VisualStudioCode
+winget install OpenJS.NodeJS.LTS
+winget install GitHub.cli
+winget install SQLite.SQLite</code></pre>
+
+        <div class="callout critical">
+          <span class="tag">⚠️ Don't skim past this</span>
+          <p><strong>Close the terminal and open a new one before you verify.</strong> Installers change your <code>PATH</code>, and an already-open terminal won't see the change. This trips up everyone exactly once — make it zero times.</p>
+        </div>
+
+        <p>Then verify — all seven must print a version:</p>
+        <pre><code>go version      # expect 1.26.x or newer
+git --version
+node --version
+npm --version
+gh --version
+sqlite3 --version
+code --version</code></pre>
+
+        <div class="callout try">
+          <span class="tag">✅ Editor extensions</span>
+          <ul style="margin:0">
+            <li><strong>Go</strong> — on first opening a <code>.go</code> file it offers to install helper tools (formatter, debugger, language server). Say yes to all. The debugger (<code>dlv</code>) is used for real later — this isn't boilerplate.</li>
+            <li><strong>SQLite Viewer</strong> — click a database file and browse it.</li>
+            <li><strong>Prettier</strong> and a <strong>React snippets</strong> pack — for the frontend phase.</li>
+          </ul>
+        </div>
+
+        <div class="callout older">
+          <span class="tag">💡 Coming from an older language?</span>
+          <p>A <em>compiler</em> (Go) turns source into one runnable file. An <em>interpreter</em> (Node) reads and runs the source each time. If you know a mainframe compile step, Go's model will feel more familiar than JavaScript's.</p>
+        </div>
+
+        <p class="ends"><strong>Ends with:</strong> nothing to commit yet — the only unit without a commit.</p>
+      </section>
+
+      <!-- UNIT 1 -->
+      <section class="unit" id="u1">
+        <div class="unit-head"><span class="unit-num">1</span><h3>Git and GitHub from zero</h3><span class="markers">🧱</span></div>
+        <p class="oneline"><strong>In one line:</strong> An account, a repo, and the branch → commit → push → pull-request loop, done once slowly.</p>
+        <p class="goal">🎯 <strong>Goal:</strong> You can push, and you've made a commit.</p>
+
+        <h5>Set up your identity</h5>
+        <ol>
+          <li>Create a GitHub account with an email you'll keep. Turn on 2FA immediately.</li>
+          <li>Tell Git who you are — this stamps every commit:</li>
+        </ol>
+        <pre><code>git config --global user.name "Your Name"
+git config --global user.email "you@example.com"
+git config --global init.defaultBranch main</code></pre>
+        <p>Authenticate the CLI so you never type a password into Git:</p>
+        <pre><code>gh auth login        # GitHub.com → HTTPS → authenticate via browser</code></pre>
+
+        <h5>Create the repo</h5>
+        <pre><code>cd ~
+gh repo create WalkApp --private --clone
+cd WalkApp</code></pre>
+
+        <div class="callout">
+          <span class="tag">🧠 Adding a collaborator</span>
+          <p>Use the web (<em>Settings → Collaborators</em>) or the API — <strong>not</strong> <code>gh repo edit</code>, which does not manage collaborators:</p>
+          <pre style="margin:.5rem 0 0"><code>gh api --method PUT repos/&lt;owner&gt;/WalkApp/collaborators/&lt;user&gt; -f permission=push</code></pre>
+        </div>
+
+        <h5>Your first commit</h5>
+        <p>Write a short <code>README.md</code>, then:</p>
+        <pre><code>git status          # read this. It's telling you a story.
+git add README.md
+git status          # read it again. What changed?
+git commit -m "Add project README."
+git push</code></pre>
+
+        <div class="callout concept">
+          <span class="tag">🧠 Learn this — the four ideas under Git</span>
+          <ul style="margin:.2rem 0 0">
+            <li>A <strong>commit</strong> is a snapshot plus a message. The message is for humans.</li>
+            <li>A <strong>branch</strong> is a movable label pointing at a commit. It's cheap. Making one is not a big deal.</li>
+            <li><strong>Local vs remote:</strong> <code>commit</code> saves on your machine, <code>push</code> sends it to GitHub. Separate on purpose.</li>
+            <li>Version control is a <em>tree of changes</em>, not a shared folder. Nothing is overwritten; everything is added. (One later unit shows you the single exception.)</li>
+          </ul>
+        </div>
+
+        <h5>The loop you'll reuse</h5>
+        <pre><code>git switch -c my-first-branch
+# ...make an edit...
+git add -A
+git commit -m "Expand the README with the app's purpose."
+git push -u origin my-first-branch
+gh pr create --fill
+# review it on GitHub, then:
+gh pr merge --squash --delete-branch
+git switch main
+git pull</code></pre>
+
+        <div class="callout concept">
+          <span class="tag">🧠 Commit message style</span>
+          <p>Imperative mood, sentence case, ending in a period: <em>"Add the paths table."</em> — not "added paths table".</p>
+        </div>
+
+        <p class="ends"><strong>Ends with:</strong> a merged pull request.</p>
+      </section>
+
+      <!-- UNIT 2 -->
+      <section class="unit" id="u2">
+        <div class="unit-head"><span class="unit-num">2</span><h3>Go, part 1</h3><span class="markers">🧱</span></div>
+        <p class="oneline"><strong>In one line:</strong> Learn Go's core syntax by writing the app's real domain model — the <code>Path</code> type and a walk-time estimate the suggestion engine will use later.</p>
+        <p class="goal">🎯 <strong>Goal:</strong> Comfort with Go's core syntax — and the first real code in the app.</p>
+
+        <div class="callout concept">
+          <span class="tag">🧠 This is real app code, not practice</span>
+          <p>You'll learn the language by building the app's <strong>domain model</strong>: a <code>Path</code> type and a function that estimates how long a walk takes. It's a command-line program for now (no web, no database), but the <code>Path</code> struct you define here is the exact type the whole app uses, and the estimate function is what the suggestion engine calls in Unit&nbsp;19. Nothing is thrown away.</p>
+        </div>
+
+        <p>Initialise the app's Go module inside the repo, and start the domain file:</p>
+        <pre><code>cd ~/WalkApp
+go mod init github.com/&lt;you&gt;/walkapp
+code .
+# create main.go with a Path struct and an EstimateWalkTime function</code></pre>
+
+        <p>Work through these, writing each one <em>into that real code</em>:</p>
+        <ol>
+          <li><strong><code>package main</code> and <code>func main()</code></strong> — the entry point.</li>
+          <li><strong><code>go run .</code> vs <code>go build</code></strong> — run from source vs produce a runnable file. Build it and double-click it, so "one binary" is concrete.</li>
+          <li><strong>Variables and types</strong> — <code>var</code> vs <code>:=</code>. Static typing, inferred.</li>
+          <li><strong>Functions</strong>, including <strong>multiple return values</strong> — alien at first, then the thing you miss elsewhere.</li>
+          <li><strong>Structs</strong> — define the real <code>Path</code> (name, distance, is-loop, surface). If you know records, this is a record with better ergonomics.</li>
+          <li><strong>Slices</strong> — a <code>[]Path</code>, the app's list of paths. Note <code>append</code> returns a new slice; this surprises everyone once.</li>
+          <li><strong><code>if</code>, <code>for</code></strong> — there's only <code>for</code>. No <code>while</code>, no <code>do</code>. One loop keyword.</li>
+          <li><strong>Errors</strong> 🔍 — see the box below. Spend real time here.</li>
+          <li><strong><code>gofmt</code></strong> — formatting isn't an opinion in Go. The editor formats on save. No style debates. This is a feature.</li>
+          <li><strong>Reading the docs</strong> — look up a standard-library function online and learn what a Go doc page looks like.</li>
+        </ol>
+
+        <div class="callout concept">
+          <span class="tag">🧠 Learn this — errors are values</span>
+          <p>Go has <strong>no exceptions</strong>. Functions return errors as ordinary values, and you check them:</p>
+          <pre style="margin:.5rem 0 0"><code>result, err := doSomething()
+if err != nil {
+    return fmt.Errorf("doing something: %w", err)
+}</code></pre>
+          <p>That block is roughly a third of all Go code. It's repetitive because it <em>is</em> — and that's the trade: errors can't be silently ignored.</p>
+        </div>
+
+        <div class="callout">
+          <span class="tag">🧠 Public vs private is spelling</span>
+          <p>A capitalised name (<code>Path</code>) is public; lowercase (<code>path</code>) is package-private. Capitalisation is <em>syntax</em>, not style.</p>
+        </div>
+
+        <p><em>Deliberately not here yet:</em> pointers, interfaces, methods, closures — those get their own unit, placed right where they're needed, so you learn them shortly before you use them.</p>
+        <p class="ends"><strong>Ends with:</strong> a committed <code>main.go</code> holding the real <code>Path</code> type and walk-time estimate. Unit 5 refactors it into a proper package; the suggestion engine imports it in Unit 19.</p>
+      </section>
+
+      <!-- ============ PHASE 1 ============ -->
+      <div class="phase" id="phase1">
+        <span class="phase-tag">Phase 1</span>
+        <h2>Data</h2>
+        <p>The foundation. A background in structured data and integrity is an asset here, not a gap.</p>
+      </div>
+
+      <!-- UNIT 3 -->
+      <section class="unit" id="u3">
+        <div class="unit-head"><span class="unit-num">3</span><h3>Designing the schema</h3><span class="markers">🧱 🔍</span></div>
+        <p class="oneline"><strong>In one line:</strong> Write the whole database design on paper, driven by the questions you want answered, before any code.</p>
+        <p class="goal">🎯 <strong>Goal:</strong> A written schema, on paper.</p>
+
+        <div class="callout try">
+          <span class="tag">✅ No computers for the first hour</span>
+          <p>Get a whiteboard. Write 15–20 real sentences you want the app to answer, in plain English:</p>
+          <ul style="margin:.4rem 0 0">
+            <li>"Show me shaded loops under 2 miles."</li>
+            <li>"Which paths near me have garbage cans?"</li>
+            <li>"I have 40 minutes and it's about to rain — where do I go?"</li>
+          </ul>
+          <p><em>Then</em> design tables that answer them. Schemas designed without the queries in mind are always wrong in the same way.</p>
+        </div>
+
+        <h5>Roughly where you'll land (argue with it)</h5>
+        <ul>
+          <li><strong>paths</strong> — id, name, description, distance, is_loop, surface, timestamps</li>
+          <li><strong>path_points</strong> — the geometry: path_id, sequence, latitude, longitude</li>
+          <li><strong>features</strong> — a point of interest on a path: path_id, kind (bench / garbage can / water / parking), latitude, longitude, note</li>
+          <li><strong>tags</strong> + <strong>path_tags</strong> — many-to-many for qualities: shaded, quiet, dog-friendly</li>
+          <li><strong>walks</strong> — walks actually taken, so suggestions can use history</li>
+        </ul>
+
+        <div class="callout concept">
+          <span class="tag">🧠 Learn this — the concepts that pay off forever</span>
+          <ul style="margin:.2rem 0 0">
+            <li><strong>Primary keys</strong> — stable identity for every row.</li>
+            <li><strong>Foreign keys</strong> — how tables reference each other. (Note: SQLite needs them explicitly turned on — done in Unit 6.)</li>
+            <li><strong>One-to-many</strong> (a path has many points) vs <strong>many-to-many</strong> (paths ↔ tags). The join table is the whole trick.</li>
+            <li><strong>Normalization</strong> — why "shaded" lives in a <code>tags</code> table, not a comma-separated column. This is the fix for repeating-group pain in flat files.</li>
+            <li><strong>Nullable vs required</strong> — say what's optional, on purpose, per column.</li>
+          </ul>
+        </div>
+
+        <div class="callout critical">
+          <span class="tag">⚠️ Don't skim past this — decide delete behaviour NOW</span>
+          <p>When a path is deleted, what happens to its points, features, tags, and walks? Cascade (they go too)? Restrict (refuse)? Soft-delete (mark, never remove)?</p>
+          <p><strong>Skipping this has a guaranteed consequence:</strong> a much later unit ships a delete endpoint, you run it, and get <code>FOREIGN KEY constraint failed</code> with no idea whether the bug is in the code, the SQL, or the schema. The answer would be "in this unit, many sessions ago." Decide it here.</p>
+        </div>
+
+        <div class="callout">
+          <span class="tag">🧠 Why <code>path_points</code> needs a <code>sequence</code> column</span>
+          <p>SQL rows have <strong>no inherent order</strong>. Without an explicit sequence, "the third point on the path" isn't a meaningful concept, no matter what order you inserted them in. This is the biggest surprise coming from sequential file processing.</p>
+        </div>
+
+        <div class="callout decision">
+          <span class="tag">🔑 The geometry decision</span>
+          <p><code>path_points</code> exists from day one even though nothing draws a map yet. You'll type a start coordinate and a couple of waypoints by hand (right-click in an online map to read the lat/lon). It's tedious but bounded — and it's the price of not re-entering every path when the map arrives. <strong>Recommendation: pay the tax.</strong></p>
+        </div>
+
+        <p class="ends"><strong>Ends with:</strong> commit <code>docs/schema.md</code> — tables, columns, types, delete behaviour, and the queries each table serves. Words and diagrams. No SQL yet.</p>
+      </section>
+
+      <!-- UNIT 4 -->
+      <section class="unit" id="u4">
+        <div class="unit-head"><span class="unit-num">4</span><h3>SQL, hands-on — no Go</h3><span class="markers">🧱</span></div>
+        <p class="oneline"><strong>In one line:</strong> Get fluent in SQL by writing the app's <em>real</em> schema — the CREATE statements you type here become the app's first migration.</p>
+        <p class="goal">🎯 <strong>Goal:</strong> Comfort writing SQL — and the app's real schema, committed.</p>
+
+        <div class="callout concept">
+          <span class="tag">🧠 What you write here is the app's schema</span>
+          <p>You'll learn SQL by building the real thing. Type your <code>CREATE TABLE</code> statements straight into <code>migrations/001_initial_schema.sql</code> and run that file against the app's real database. In Unit 8 the migration runner you build will run this exact file — so the schema you design today is what ships.</p>
+        </div>
+
+        <div class="callout">
+          <span class="tag">🧠 Why still no Go this unit</span>
+          <p>Mixing a new language with a new database means when something breaks, you don't know which one broke. So this unit stays pure SQL — but against the real database, not a throwaway.</p>
+        </div>
+        <pre><code>cd ~/WalkApp
+mkdir migrations
+# write your CREATE TABLE statements in migrations/001_initial_schema.sql
+sqlite3 walk.db &lt; migrations/001_initial_schema.sql   # run it
+sqlite3 walk.db                                       # open it and explore</code></pre>
+
+        <div class="callout">
+          <span class="tag">🧠 What's committed vs what isn't</span>
+          <p>The migration files and your <code>docs/queries.sql</code> are committed and accrue. The <code>walk.db</code> file itself is git-ignored and disposable <em>on purpose</em> — the whole point of migrations is that the database is reproducible from the committed SQL. Delete it any time and rebuild.</p>
+        </div>
+
+        <h5>First: getting data in and out</h5>
+        <ol>
+          <li><strong>CREATE TABLE</strong> — type every table into the migration file, including the <code>REFERENCES ... ON DELETE CASCADE</code> clauses you decided on.</li>
+          <li><strong>SQLite's type system</strong> — it's dynamic, with type <em>affinity</em> rather than strict types. Ten minutes, but a foot-gun if you assume stricter rules.</li>
+          <li><strong>INSERT</strong> — three or four real paths near your house. These are the app's actual starter data (and your test data for every unit that follows).</li>
+          <li><strong>SELECT</strong> — start with everything, then narrow with <code>WHERE</code>, <code>ORDER BY</code>, <code>LIMIT</code>.</li>
+        </ol>
+
+        <div class="callout critical">
+          <span class="tag">⚠️ Don't skim past this — two habits that save you</span>
+          <ul style="margin:.2rem 0 0">
+            <li><strong>NULL is not zero and not empty string.</strong> <code>NULL = NULL</code> is <em>not true</em>. Let this bite you now, on purpose, while it's just your own starter data.</li>
+            <li><strong>Before any DELETE or UPDATE, run the <code>WHERE</code> as a SELECT first.</strong> Confirm it hits exactly the rows you meant, <em>then</em> change it to a delete. Every single time. Forever.</li>
+          </ul>
+        </div>
+
+        <h5>Then: the parts that matter most</h5>
+        <ol start="5">
+          <li><strong>JOIN</strong> 🧱 — the concept that unlocks relational databases, worth most of a session on its own. <code>INNER JOIN</code> first, then <code>LEFT JOIN</code>. The difference must be <em>felt</em>, not read — that's 45 minutes of experimenting.</li>
+          <li><strong>GROUP BY and aggregates</strong> — <code>COUNT</code>, <code>AVG</code>, <code>SUM</code>. "How many garbage cans per path?"</li>
+          <li><strong>Transactions</strong> — <code>BEGIN</code> / <code>COMMIT</code> / <code>ROLLBACK</code>. Break one halfway on purpose and roll it back.</li>
+          <li><strong>Prove the cascade</strong> — turn foreign keys on, delete a path, watch its points vanish. Turn them off, try again, watch the orphans survive.</li>
+          <li><strong>Indexes</strong> — add one, then run <code>EXPLAIN QUERY PLAN</code> before and after. Watch <code>SCAN</code> become <code>SEARCH</code>. This is the "why is it slow" tool.</li>
+        </ol>
+
+        <div class="callout older">
+          <span class="tag">💡 The big mental shift</span>
+          <p>SQL is <strong>declarative</strong> — you describe the result you want, not the steps to get it. Coming from procedural code, the urge to write the loop yourself takes weeks to fade. A join replaces nested loops over two files — and does it better than you would.</p>
+        </div>
+
+        <p class="ends"><strong>Ends with:</strong> commit <code>docs/queries.sql</code> — real queries answering your Unit 3 questions, with comments.</p>
+      </section>
+
+      <!-- UNIT 5 -->
+      <section class="unit" id="u5">
+        <div class="unit-head"><span class="unit-num">5</span><h3>Go, part 2</h3><span class="markers">🧱 🔍</span></div>
+        <p class="oneline"><strong>In one line:</strong> The specific Go — pointers above all — that every remaining unit quietly requires.</p>
+        <p class="goal">🎯 <strong>Goal:</strong> The language features the database and web code depend on.</p>
+
+        <div class="callout critical">
+          <span class="tag">⚠️ Don't skim past this — why this unit exists</span>
+          <p>Skip it and the next unit opens with you typing <code>rows.Scan(p.Name)</code> and getting a cryptic error about types and pointers. Someone says "put an ampersand there," it compiles, and <strong>nobody learned anything</strong> — you were transcribing, not understanding. That failure looks exactly like progress from the inside, which is why it runs for weeks unnoticed. Do this unit first.</p>
+        </div>
+
+        <ol>
+          <li><strong>Pointers</strong> 🧱 — <code>&amp;</code> and <code>*</code>. See the box below. This is the wall.</li>
+          <li><strong><code>defer</code></strong> — runs when the function exits, no matter how. You'll use <code>defer rows.Close()</code> constantly.</li>
+          <li><strong>Methods and receivers</strong> — <code>func (s *Store) GetPath(id int)</code>. What that thing before the name is.</li>
+          <li><strong>Interfaces</strong> 🧱 — as a <em>language feature</em>. The reveal: <code>error</code> is an interface, so you've been using one since Unit 2. The idea to land: <em>a type is a promise about behaviour, not a description of a thing.</em></li>
+          <li><strong>Closures</strong> — a function that returns a function. Middleware, later, is exactly this.</li>
+          <li><strong>Packages</strong> — directories, import paths, how a multi-file program is laid out.</li>
+          <li><strong>Adding dependencies</strong> — <code>go get</code> and what the lock file is for.</li>
+        </ol>
+
+        <div class="callout critical">
+          <span class="tag">⚠️ Spend 40 minutes on pointers, with the debugger open</span>
+          <p>Pointers are the thing with the fewest analogues in older procedural languages, and they show up <em>everywhere</em> from here on — in scanning rows, in the database handle, in method receivers, in optional fields. Set a breakpoint, watch a struct fill in through a pointer, and make it concrete rather than syntactic. Get past this wall and much of what follows is downhill.</p>
+        </div>
+
+        <div class="callout try">
+          <span class="tag">✅ Practice target — reshape the real domain code</span>
+          <p>Move the <code>Path</code> type and walk-time estimate from Unit 2's <code>main.go</code> into a real <code>internal/walk</code> package, turn the estimate into a <em>method</em> on <code>Path</code>, and define the interface the suggestion engine will later satisfy. <code>main.go</code> now imports and calls it. Small, but it exercises all seven ideas at once — and it's the actual package structure the rest of the app builds on.</p>
+        </div>
+
+        <p class="ends"><strong>Ends with:</strong> the app's domain package (<code>internal/walk</code>), imported by <code>main.go</code>. Commit.</p>
+      </section>
+
+      <!-- UNIT 6 -->
+      <section class="unit" id="u6">
+        <div class="unit-head"><span class="unit-num">6</span><h3>Go talks to the database</h3><span class="markers">🌉 🔍</span></div>
+        <p class="oneline"><strong>In one line:</strong> The app reads the real paths you entered in Unit 4 out of its own database. Small, complete, entirely yours.</p>
+        <p class="goal">🎯 <strong>Goal:</strong> The app reads its paths out of SQLite. Migrations come later — the win comes first.</p>
+
+        <div class="callout critical">
+          <span class="tag">⚠️ Don't skim past this — the driver choice</span>
+          <p>Use <strong><code>modernc.org/sqlite</code></strong>. <em>Not</em> <code>mattn/go-sqlite3</code>, which nearly every tutorial recommends — it needs a C compiler and is a genuine afternoon of Windows pain. The modernc driver is pure Go: <code>go get</code> and it works.</p>
+          <p><strong>And the driver name is <code>"sqlite"</code>, not <code>"sqlite3"</code>.</strong> When you copy a snippet off the internet, that's the line to change.</p>
+        </div>
+
+        <pre><code>cd ~/WalkApp
+go get modernc.org/sqlite    # the module was already created in Unit 2</code></pre>
+
+        <pre><code>import (
+    "database/sql"
+    _ "modernc.org/sqlite"
+)
+
+db, err := sql.Open("sqlite",
+    "file:walk.db?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)")</code></pre>
+
+        <details class="why">
+          <summary>Why every part of that connection string matters</summary>
+          <ul>
+            <li><strong>The blank import <code>_</code></strong> — you never call the driver directly. Importing it runs its setup, which registers it with <code>database/sql</code>. Weird once; a common Go pattern.</li>
+            <li><strong><code>foreign_keys(1)</code></strong> — SQLite ignores foreign keys unless asked. Your relationships are decorative without it.</li>
+            <li><strong><code>journal_mode(WAL)</code></strong> — write-ahead logging, so readers don't block the writer.</li>
+            <li><strong><code>busy_timeout(5000)</code></strong> — wait 5s for a lock instead of erroring instantly.</li>
+            <li><strong><code>sql.Open</code> doesn't actually connect.</strong> It's lazy. Call <code>db.Ping()</code> to find out whether it works.</li>
+          </ul>
+        </details>
+
+        <div class="callout critical">
+          <span class="tag">⚠️ Put the pragmas in the connection string, not a one-off command</span>
+          <p>A pragma set with <code>db.Exec("PRAGMA ...")</code> applies to <em>one</em> connection. But the database handle is a <strong>pool</strong> of connections, so your setting would silently apply to some queries and not others. Putting it in the connection string applies it to every connection the pool opens. This is the kind of bug that works on your machine for a month.</p>
+        </div>
+
+        <div class="callout concept">
+          <span class="tag">🧠 Learn this — reading rows safely</span>
+          <ul style="margin:.2rem 0 0">
+            <li><code>QueryRow</code> vs <code>Query</code> vs <code>Exec</code>, and always <code>defer rows.Close()</code>.</li>
+            <li>Read the real paths from Unit 4 with <code>Query</code> + <code>rows.Next()</code> into a <code>[]walk.Path</code> — reusing the domain type you already built.</li>
+            <li>Check <strong><code>rows.Err()</code></strong> after a loop — the one everyone forgets. A loop can end because it finished <em>or</em> because it broke, and only this tells you which.</li>
+            <li><strong>Placeholders, never string-building:</strong> <code>db.Query("... WHERE id = ?", id)</code>. Building SQL with string formatting is how injection happens. Never. Not once.</li>
+          </ul>
+        </div>
+
+        <p class="ends"><strong>Ends with:</strong> <code>go run .</code> prints a real path. Commit — and add <code>*.db</code>, <code>*.db-wal</code>, <code>*.db-shm</code> to <code>.gitignore</code>. 🔍 <strong>Never commit the database.</strong> It's generated, binary, and causes merge conflicts you cannot resolve.</p>
+      </section>
+
+      <!-- UNIT 7 -->
+      <section class="unit" id="u7">
+        <div class="unit-head"><span class="unit-num">7</span><h3>When it breaks</h3><span class="markers">🧱</span></div>
+        <p class="oneline"><strong>In one line:</strong> The debugging skills you'll spend most of your first month using — taught right when you have a backlog of confusion to spend on them.</p>
+        <p class="goal">🎯 <strong>Goal:</strong> Read errors, drive a debugger, get unstuck.</p>
+
+        <ol>
+          <li><strong>Read five real compile errors</strong> — induce them on purpose (unused variable, wrong type in an argument, missing return, undefined name). This <em>is</em> the Go experience for the first month; reading them fluently is the whole difference.</li>
+          <li><strong>Read a real panic</strong> — force one, then read the message and the stack trace beneath it. Reading a stack trace is a skill, learnable in 20 minutes, worth a hundred hours downstream.</li>
+          <li><strong>The debugger</strong> — set a breakpoint, step through your row-scanning code, watch the struct fill in through the pointers. If pointers still felt abstract, this is where they stop being abstract.</li>
+          <li><strong>Read a docs page properly</strong> — pick one standard-library function and decode its full signature together.</li>
+          <li><strong>Run the linter</strong> locally, now, not for the first time in CI six units later.</li>
+        </ol>
+
+        <div class="callout try">
+          <span class="tag">✅ Write your stuck-ladder into the README</span>
+          <p>Something like: re-read the error aloud → check the docs → look at what you just changed (<code>git diff</code>) → use the debugger → explain it to someone (or a rubber duck) → walk away for 20 minutes → ask for help. Having a written ladder helps more than it sounds like it would, especially late at night when there's no one at the next desk.</p>
+        </div>
+
+        <p class="ends"><strong>Ends with:</strong> a README section with the ladder and the AI rule. Commit.</p>
+      </section>
+
+      <!-- UNIT 8 -->
+      <section class="unit" id="u8">
+        <div class="unit-head"><span class="unit-num">8</span><h3>The schema has a history</h3><span class="markers">🔍</span></div>
+        <p class="oneline"><strong>In one line:</strong> Write the runner that automatically applies the migration file you already wrote in Unit 4 — so the database rebuilds itself from committed SQL.</p>
+        <p class="goal">🎯 <strong>Goal:</strong> Migrations, from scratch, running your real schema.</p>
+
+        <p>You already have <code>migrations/001_initial_schema.sql</code> from Unit 4, and you've been running it by hand. This unit automates that:</p>
+        <ul>
+          <li>Read the numbered files from the <code>migrations/</code> folder you already have.</li>
+          <li>A <code>schema_migrations</code> table recording what's run.</li>
+          <li>On startup: find the un-run ones, run each <strong>in a transaction</strong>, record it.</li>
+          <li>Read them from disk for now. A later unit swaps that for embedding — as a diff against working code, the best way to learn it.</li>
+        </ul>
+
+        <div class="callout try">
+          <span class="tag">✅ Prove it rebuilds from nothing</span>
+          <p>Delete <code>walk.db</code> entirely, then run the app. The runner recreates the whole schema from your committed migration files. Re-enter (or seed) your starter paths. This is the migrations promise made concrete: the database is reproducible, so losing it is never a disaster.</p>
+        </div>
+
+        <div class="callout critical">
+          <span class="tag">⚠️ Don't skim past this</span>
+          <p>Write the runner as <code>func migrate(db *sql.DB) error</code> — <strong>not inline in <code>main()</code></strong>. The obvious first draft buries it in <code>main</code>, and then a later unit ("test the store against a temp database") has no way to create a schema. Small decision, delayed consequence.</p>
+        </div>
+
+        <div class="callout concept">
+          <span class="tag">🧠 Learn this</span>
+          <ul style="margin:.2rem 0 0">
+            <li><strong>Why migrations exist:</strong> the schema has a <em>history</em>, and every environment must be able to replay it. This is what makes database change safe and repeatable instead of a person running commands by hand at 2am.</li>
+            <li><strong>Append-only.</strong> You never edit a migration that's already run; you write a new one. Annoying for a week, then it saves you forever.</li>
+          </ul>
+        </div>
+
+        <p class="ends"><strong>Ends with:</strong> <code>go run .</code> creates the database and applies migrations. Commit.</p>
+      </section>
+
+      <!-- ============ PHASE 2 ============ -->
+      <div class="phase" id="phase2">
+        <span class="phase-tag">Phase 2</span>
+        <h2>The API</h2>
+        <p>Where the app becomes a service rather than a script.</p>
+      </div>
+
+      <!-- UNIT 9 -->
+      <section class="unit" id="u9">
+        <div class="unit-head"><span class="unit-num">9</span><h3>An HTTP server</h3><span class="markers">🧱</span></div>
+        <p class="oneline"><strong>In one line:</strong> A server that answers a browser — using the standard library and no framework.</p>
+        <p class="goal">🎯 <strong>Goal:</strong> A running server with a health endpoint.</p>
+
+        <pre><code>mux := http.NewServeMux()
+mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+})
+http.ListenAndServe(":8080", mux)</code></pre>
+        <p>That's the entire web framework. There isn't one. This is standard library.</p>
+
+        <div class="callout concept">
+          <span class="tag">🧠 Learn this</span>
+          <ul style="margin:.2rem 0 0">
+            <li><strong>What HTTP is:</strong> a request (method, path, headers, body) and a response (status, headers, body). Text over a socket. Much simpler than it looks from outside.</li>
+            <li><strong>Methods:</strong> GET reads, POST creates, PUT/PATCH updates, DELETE removes. Conventions, but universally expected.</li>
+            <li><strong>Status codes:</strong> 200 ok, 201 created, 400 you sent nonsense, 404 not found, 500 I broke. Getting these right is most of what makes an API pleasant.</li>
+            <li><strong>Modern routing:</strong> <code>"GET /api/paths/{id}"</code> in the pattern, read it with <code>r.PathValue("id")</code>. Older tutorials predate this and reach for extra libraries — you need none.</li>
+          </ul>
+        </div>
+
+        <div class="callout critical">
+          <span class="tag">⚠️ Don't skim past this — every handler runs concurrently</span>
+          <p>Each request runs in its own lightweight thread. Ten browsers means ten copies of your handler running <em>at the same time</em>. Anything they share needs protecting. <strong>Prove it:</strong> put a global <code>counter++</code> in a handler, hammer it with a loop of requests, and watch it print a number that's visibly wrong. You just wrote a data race in four lines. A later unit is where it would have bitten you for real.</p>
+        </div>
+
+        <p>Explore with <strong>both</strong> a browser and <code>curl</code>. The browser only does GET easily; <code>curl</code> does everything and is how you'll test the rest.</p>
+        <p class="ends"><strong>Ends with:</strong> a health endpoint. Commit.</p>
+      </section>
+
+      <!-- UNIT 10 -->
+      <section class="unit" id="u10">
+        <div class="unit-head"><span class="unit-num">10</span><h3>Reading, and the seam</h3><span class="markers">🌉 🔍</span></div>
+        <p class="oneline"><strong>In one line:</strong> List and fetch paths over JSON — and introduce the interface that lets two areas (and two people) work without colliding.</p>
+        <p class="goal">🎯 <strong>Goal:</strong> Real paths as JSON in a browser.</p>
+
+        <div class="callout decision">
+          <span class="tag">🔑 The layering decision</span>
+          <p>Three layers, one job each:</p>
+          <pre style="margin:.5rem 0"><code>handler   (HTTP: parse request, write response, choose status)
+   ↓  a PathStore interface
+store     (SQL: the only place that knows a database exists)
+   ↓
+database</code></pre>
+          <p>Handlers never write SQL. The store never touches the HTTP response. That single rule is why a future "swap the database engine" is a lesson and not a rewrite — and why you can test each half without the other.</p>
+        </div>
+
+        <div class="callout">
+          <span class="tag">🧠 An interface is a contract between two workers</span>
+          <p>If you're pairing, this is the natural split: one person owns the store (SQL, scanning, transactions), the other owns the handlers (status codes, JSON, validation). Agree the interface first, then work against it — and review each other's side, since neither watched the other type.</p>
+        </div>
+
+        <div class="callout concept">
+          <span class="tag">🧠 Learn this</span>
+          <ul style="margin:.2rem 0 0">
+            <li><strong>Struct tags:</strong> a small annotation maps a Go field name to the JSON name the frontend wants. Go and JavaScript disagree about naming; the tag is the translator.</li>
+            <li><strong>Marshal / unmarshal</strong> — struct ↔ JSON bytes.</li>
+            <li><strong>REST:</strong> resources are nouns, methods are verbs. <code>/api/paths/3</code>, not <code>/api/getPath?id=3</code>.</li>
+            <li><strong>The big idea:</strong> depend on what something <em>does</em>, not what it <em>is</em>. If you take one architectural lesson from this whole course, it's this.</li>
+          </ul>
+        </div>
+
+        <p class="ends"><strong>Ends with:</strong> real paths as JSON in a browser. Commit.</p>
+      </section>
+
+      <!-- UNIT 11 -->
+      <section class="unit" id="u11">
+        <div class="unit-head"><span class="unit-num">11</span><h3>Writing, and the geometry</h3><span class="markers">🌉 🔍</span></div>
+        <p class="oneline"><strong>In one line:</strong> Create a path <em>with its points</em>, and delete one — the unit that finally makes the geometry decision real.</p>
+        <p class="goal">🎯 <strong>Goal:</strong> Paths with geometry, creatable and deletable.</p>
+
+        <div class="callout concept">
+          <span class="tag">🧠 Learn this — two core database moves</span>
+          <p>Collecting nested points forces the two most important write patterns in the whole course:</p>
+          <ul style="margin:.3rem 0 0">
+            <li><strong>Last-inserted id</strong> — insert the parent path, get its new id, insert the child points with it.</li>
+            <li><strong>A multi-statement write in one transaction</strong> — the path and its N points commit together or not at all. A path with half its points is worse than no path.</li>
+          </ul>
+        </div>
+
+        <p>Then the delete endpoint — and the cascade you decided in Unit 3 and proved in Unit 4 does its job. If you skipped either, this is where you'd lose 90 minutes to a mystery.</p>
+
+        <div class="callout try">
+          <span class="tag">✅ Try to break it with curl</span>
+          <p>Send a string where a number goes. Send <code>{}</code>. Send malformed JSON. Send a path with zero points, and one with 500. Ask for a path that doesn't exist. Find where it panics — it will — and that becomes the next unit.</p>
+        </div>
+
+        <p class="ends"><strong>Ends with:</strong> paths with geometry, creatable and deletable. Commit.</p>
+      </section>
+
+      <!-- UNIT 12 -->
+      <section class="unit" id="u12">
+        <div class="unit-head"><span class="unit-num">12</span><h3>Updating</h3><span class="markers">🔍</span></div>
+        <p class="oneline"><strong>In one line:</strong> Full-replace updates first (easy), then partial updates — and meet the pointer as the answer to a problem you just hit.</p>
+        <p class="goal">🎯 <strong>Goal:</strong> Full CRUD.</p>
+
+        <ul>
+          <li><strong>PUT first.</strong> Full replace. Dumb. Send the whole path, overwrite it. Works in twenty minutes.</li>
+          <li><strong>Then feel why the UI wants PATCH</strong> — a screen that toggles one field shouldn't have to send everything.</li>
+        </ul>
+
+        <div class="callout decision">
+          <span class="tag">🔑 Pointers for optional fields</span>
+          <p>A partial update must tell "set this to false" apart from "don't touch this". A plain boolean can't — but a <em>pointer</em> to a boolean can also be empty (nil). That distinction is the whole reason the type exists.</p>
+        </div>
+
+        <div class="callout critical">
+          <span class="tag">⚠️ Don't skim past this — one subtle SQL rule</span>
+          <p>Building a partial update means assembling SQL from whichever fields were provided — which brushes against the Unit 6 rule "never build SQL from strings." The reconciliation: <strong>interpolating column names you control is fine; interpolating values you don't control is an injection.</strong> Talk it through until it's obvious.</p>
+        </div>
+
+        <p>Ordering is the lesson: pointers-as-optional lands ten times harder as the answer to a question you asked than as a footnote handed to you.</p>
+        <p class="ends"><strong>Ends with:</strong> full CRUD, proven with <code>curl</code>. Commit.</p>
+      </section>
+
+      <!-- UNIT 13 -->
+      <section class="unit" id="u13">
+        <div class="unit-head"><span class="unit-num">13</span><h3>Making it not fall over</h3></div>
+        <p class="oneline"><strong>In one line:</strong> Validation, honest error responses, and middleware.</p>
+        <p class="goal">🎯 <strong>Goal:</strong> The server survives abuse.</p>
+
+        <ol>
+          <li><strong>Validation</strong> — reject a path with no name, a negative distance, a latitude outside −90..90. Return <strong>400</strong> with a message that says what's wrong. Validate at the handler boundary, before anything reaches the store.</li>
+          <li><strong>Error handling</strong> — "no rows" is a <strong>404</strong>, not a leaked database message. A raw SQL failure is a <strong>500</strong>, and the detail goes to <em>your</em> log, not the user's screen.</li>
+          <li><strong>Middleware</strong> — a function wrapping a handler. Write two: request logging, and panic recovery so one bad request can't kill the server.</li>
+        </ol>
+
+        <div class="callout concept">
+          <span class="tag">🧠 The one rule for errors</span>
+          <p><strong>Log the detail, return the category.</strong> The user gets "not found"; your log gets the stack trace. And middleware being "just a function returning a function" is where Unit 5's closures earn their keep.</p>
+        </div>
+
+        <p class="ends"><strong>Ends with:</strong> it survives the curl abuse from Unit 11. Commit.</p>
+      </section>
+
+      <!-- UNIT 14 -->
+      <section class="unit" id="u14">
+        <div class="unit-head"><span class="unit-num">14</span><h3>Tests</h3><span class="markers">🧱</span></div>
+        <p class="oneline"><strong>In one line:</strong> Automated tests, the race detector, and a merge conflict faced on purpose while it's safe.</p>
+        <p class="goal">🎯 <strong>Goal:</strong> A green test suite, and conflicts stop being scary.</p>
+
+        <ol>
+          <li><strong>Table-driven tests</strong> — the idiomatic Go style. Test the validation logic.</li>
+          <li><strong>In-process handler tests</strong> — test a handler with no live server. A new mental model: a fake server inside the test.</li>
+          <li><strong>Store tests against a temp database</strong> — and this is why the migration runner was made a function back in Unit 8.</li>
+          <li><strong>The race detector</strong> — run the tests with race detection on. Meet it now, so it's familiar before the weather cache needs it.</li>
+        </ol>
+
+        <div class="callout try">
+          <span class="tag">✅ Manufacture a merge conflict on purpose</span>
+          <p>Two branches edit the same function; merge them. Resolve it together. Conflicts are terrifying exactly once, and only if the first one is real and urgent — meet <code>&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD</code> on a quiet afternoon in a sandbox instead. Note that dependency lock files are conflict magnets.</p>
+        </div>
+
+        <p class="ends"><strong>Ends with:</strong> the suite passes, with and without race detection. Commit.</p>
+      </section>
+
+      <!-- ============ PHASE 3 ============ -->
+      <div class="phase" id="phase3">
+        <span class="phase-tag">Phase 3</span>
+        <h2>The face</h2>
+        <p>The web UI, and the moment the two halves become one app.</p>
+      </div>
+
+      <!-- UNIT 15 -->
+      <section class="unit" id="u15">
+        <div class="unit-head"><span class="unit-num">15</span><h3>UI scaffold</h3><span class="markers">🎁</span></div>
+        <p class="oneline"><strong>In one line:</strong> A React app with a tiny, deliberate design system — a good solo, pull-request unit.</p>
+        <p class="goal">🎯 <strong>Goal:</strong> A styled page, no data yet.</p>
+
+        <pre><code>cd ~/WalkApp
+npm create vite@latest web -- --template react-ts
+cd web && npm install && npm run dev</code></pre>
+
+        <div class="callout concept">
+          <span class="tag">🧠 A design system of about a dozen variables</span>
+          <p>Put ~12 CSS custom properties on <code>:root</code> and build everything from them. Greens and earth tones suit a walking app.</p>
+          <pre style="margin:.5rem 0 0"><code>--bg  --ink  --muted  --paper  --line  --accent  --on-accent
+--warn  --info  --topbar  --input  --radius</code></pre>
+          <p>Twelve tokens is the <em>entire</em> design system. Resist a thirteenth.</p>
+        </div>
+
+        <ul>
+          <li><strong>Self-host your font</strong> — drop the font files in and declare them with <code>@font-face</code>, rather than depending on an external service.</li>
+          <li><strong>A small component vocabulary</strong> — pill buttons, cards with a subtle border, an uppercase letter-spaced label above each card title, one big display heading that scales with the viewport.</li>
+          <li><strong>A flat source folder</strong> — the app is small; deep nesting earns nothing.</li>
+        </ul>
+
+        <div class="callout concept">
+          <span class="tag">🧠 Learn this</span>
+          <p>Components, props, and simple state. <strong>JSX is not HTML</strong> (different attribute names, curly braces for expressions, one root element). What the build tool does. And why theming through CSS variables is nearly free.</p>
+        </div>
+
+        <p class="ends"><strong>Ends with:</strong> a styled page, no data. If pairing, merge it as a reviewed pull request.</p>
+      </section>
+
+      <!-- UNIT 16 -->
+      <section class="unit" id="u16">
+        <div class="unit-head"><span class="unit-num">16</span><h3>Frontend meets backend</h3><span class="markers">🌉 🎁</span></div>
+        <p class="oneline"><strong>In one line:</strong> The React app lists paths that came out of the database. The whole thing is real for the first time.</p>
+        <p class="goal">🎯 <strong>Goal:</strong> Paths on screen, creatable from the browser.</p>
+
+        <p>This is the first session where something breaks and you don't know <em>which side</em> broke it. Budget for that — it's normal.</p>
+        <ol>
+          <li><strong>Fetch the list</strong> into component state when the page loads. No extra data libraries — plain fetch is right at this size.</li>
+          <li><strong>Loading and error states</strong> — the request takes time and can fail. A UI with no loading state <em>looks</em> broken. This is correctness, not polish.</li>
+          <li><strong>A create form</strong> — POST a path <em>with its points</em>, and the list updates. Yes, typing coordinates by hand is tedious; this is the tax Unit 3 warned about, and it's why the map later is additive.</li>
+        </ol>
+
+        <div class="callout decision">
+          <span class="tag">🔑 Use a dev proxy, not CORS</span>
+          <p>The dev server and the API run on different ports, and the browser blocks that by default. Rather than write cross-origin code you'll later delete, proxy the API path through the dev server — three lines of config, and it matches how production works (one server, same origin).</p>
+        </div>
+
+        <div class="callout older">
+          <span class="tag">💡 The mental jump</span>
+          <p><strong>Async.</strong> A fetch returns a promise, and the UI renders <em>before</em> the data arrives. If you're used to code that blocks until it has an answer, give this real time.</p>
+        </div>
+
+        <div class="callout try">
+          <span class="tag">✅ Trace the full round trip out loud, once</span>
+          <p>click → fetch → handler → SQL → row → JSON → state → pixels. When something breaks later, debugging <em>is</em> walking this path and asking where it stopped. Watch the real request and response in the browser's network panel — that's where most frontend bugs die.</p>
+        </div>
+
+        <p class="ends"><strong>Ends with:</strong> paths on screen, creatable from the browser. Commit. 🎁</p>
+      </section>
+
+      <!-- UNIT 17 -->
+      <section class="unit" id="u17">
+        <div class="unit-head"><span class="unit-num">17</span><h3>Tags, features, and walks</h3></div>
+        <p class="oneline"><strong>In one line:</strong> The many-to-many end to end — plus the walk log the suggestion engine will depend on.</p>
+        <p class="goal">🎯 <strong>Goal:</strong> Tagging works; walks are logged.</p>
+
+        <p>Tagging a path "shaded" touches every layer: join table, store method, endpoint, UI control. It's a lap around the whole track, and it should feel much easier than the units before it. If it doesn't, that's useful information about where to slow down.</p>
+        <p>Add tag chips on the card, a tag filter on the list, and features (garbage cans, benches, parking) with their coordinates.</p>
+
+        <div class="callout critical">
+          <span class="tag">⚠️ Don't skip the walk log</span>
+          <p>Add an "I walked this" button → one POST → one insert. It's the smallest complete vertical slice, so it's the ideal thing to build solo, unaided, through every layer. It's also load-bearing: the suggestion engine scores on walk history. With no writer, that table stays empty forever and two scoring rules silently do nothing — they'd <em>look</em> alive and be dead.</p>
+        </div>
+
+        <p class="ends"><strong>Ends with:</strong> tagging works, walks are logged. Commit.</p>
+      </section>
+
+      <!-- ============ PHASE 4 ============ -->
+      <div class="phase" id="phase4">
+        <span class="phase-tag">Phase 4</span>
+        <h2>The actual idea</h2>
+        <p>The payoff. Everything so far built the machine; this is the part you wanted.</p>
+      </div>
+
+      <!-- UNIT 18 -->
+      <section class="unit" id="u18">
+        <div class="unit-head"><span class="unit-num">18</span><h3>Consuming someone else's API</h3><span class="markers">🎁</span></div>
+        <p class="oneline"><strong>In one line:</strong> Go fetches the weather — the client side of API work, and where the data race from Unit 9 finally shows up.</p>
+        <p class="goal">🎯 <strong>Goal:</strong> A weather endpoint, race-free. A good solo, pull-request unit.</p>
+
+        <p>Use <strong>Open-Meteo</strong> — no key, no account. Paste the URL in a browser first and read the JSON:</p>
+        <pre><code>https://api.open-meteo.com/v1/forecast?latitude=42.36&longitude=-71.06
+    &hourly=temperature_2m,precipitation_probability
+    &temperature_unit=fahrenheit&timezone=auto</code></pre>
+
+        <div class="callout">
+          <span class="tag">🧠 Two easy-to-miss parameters</span>
+          <p>The API defaults to Celsius and GMT. Without <code>temperature_unit</code> and <code>timezone=auto</code>, you get metric temperatures and timestamps that don't line up with "what's the weather this afternoon."</p>
+        </div>
+
+        <div class="callout critical">
+          <span class="tag">⚠️ Don't skim past this — two things that bite in production</span>
+          <ul style="margin:.2rem 0 0">
+            <li><strong>Give your HTTP client a timeout.</strong> The default client has <em>none</em>. If the weather service hangs, your handler hangs forever. This is a real outage cause. Always set a timeout.</li>
+            <li><strong>The cache needs a lock.</strong> Cache the weather for ~15 minutes so you don't call the API on every request — but that cache is shared state read and written by concurrent handlers. Write it <em>without</em> a lock first, run the race detector, and watch it catch the bug you just wrote. Best fifteen minutes in the whole course; it turns an abstract warning into a tool you trust.</li>
+          </ul>
+        </div>
+
+        <div class="callout concept">
+          <span class="tag">🧠 Learn this</span>
+          <ul style="margin:.2rem 0 0">
+            <li>Being an API <strong>client</strong> rather than a server — the half most developers spend more time in.</li>
+            <li><strong>Unmarshalling JSON you don't control</strong> — define a struct for only the fields you want; the rest is ignored.</li>
+            <li><strong>Graceful degradation</strong> 🔑 — if the weather call fails, the app must still suggest walks, just without weather input. A dependency being down is not an excuse to be down.</li>
+          </ul>
+        </div>
+
+        <p class="ends"><strong>Ends with:</strong> a weather endpoint, race-free. If pairing, merge as a reviewed pull request.</p>
+      </section>
+
+      <!-- UNIT 19 -->
+      <section class="unit" id="u19">
+        <div class="unit-head"><span class="unit-num">19</span><h3>The suggestion engine</h3><span class="markers">🎁</span></div>
+        <p class="oneline"><strong>In one line:</strong> "Where should I walk today?" gets a real, explainable answer. The most interesting code in the app, with no single right answer.</p>
+        <p class="goal">🎯 <strong>Goal:</strong> A ranked suggestion from mood, time, weather, and history.</p>
+
+        <p>The approach is <strong>scoring</strong>: every path earns points against the request, then you sort.</p>
+        <pre><code>Input:  mood, available time, weather, walk history
+Output: paths, ranked, each with a reason</code></pre>
+
+        <div class="mini" style="margin:1rem 0">
+          <h4>Rules to argue about (the fun part)</h4>
+          <p>Hot and sunny → shaded paths up · Raining → paved up, muddy trails down · "quick" → distance near your available time · "explore" → least-recently-walked up · "with the dog" → dog-friendly required, garbage cans up · walked yesterday → down, for variety.</p>
+        </div>
+
+        <div class="callout concept">
+          <span class="tag">🧠 Learn this</span>
+          <ul style="margin:.2rem 0 0">
+            <li><strong>Business logic as its own layer</strong> — testable with no database and no server. This is where Unit 10's layering pays a visible dividend: you can test the whole engine with plain values.</li>
+            <li><strong>Tuning is guessing, then adjusting.</strong> How do you decide shade is worth 3 and distance-fit is worth 5? You don't, really. You guess, use it, and adjust. Getting comfortable with that <em>is</em> the lesson.</li>
+          </ul>
+        </div>
+
+        <div class="callout decision">
+          <span class="tag">🔑 Return the reason, not just the ranking</span>
+          <p>Each suggestion should say <em>why</em> it scored well ("shaded, and it's 85°"). Recommendations without reasons feel arbitrary and people stop trusting them — and reasons make the thing debuggable, which is not a coincidence.</p>
+        </div>
+
+        <p>This is the one place where "we spent a while arguing about weights" is a success, not a delay.</p>
+        <p class="ends"><strong>Ends with:</strong> a working <code>/api/suggest</code> endpoint. Commit.</p>
+      </section>
+
+      <!-- UNIT 20 -->
+      <section class="unit" id="u20">
+        <div class="unit-head"><span class="unit-num">20</span><h3>The suggestion UI</h3><span class="markers">🎁</span></div>
+        <p class="oneline"><strong>In one line:</strong> The screen you'll actually use, outdoors, one-handed.</p>
+        <p class="goal">🎯 <strong>Goal:</strong> The app becomes genuinely useful.</p>
+
+        <p>Mood picker, time slider, a ranked list of cards with their reasons, today's weather in the corner. Design it <strong>big, glanceable, and phone-first</strong> — you'll read it in sunlight, holding a leash.</p>
+
+        <div class="callout">
+          <span class="tag">🧠 The design vocabulary already exists</span>
+          <p>Because of the tokens and components from Unit 15, this unit is assembly, not design. Design for the real context: sunlight and one free hand are genuine constraints. Set responsive breakpoints so it reflows cleanly on a phone.</p>
+        </div>
+
+        <p class="ends"><strong>Ends with:</strong> the app is genuinely useful. Take it for a walk. 🎁</p>
+      </section>
+
+      <!-- ============ PHASE 5 ============ -->
+      <div class="phase" id="phase5">
+        <span class="phase-tag">Phase 5</span>
+        <h2>Making it real</h2>
+        <p>One file to run, a machine that checks your work, and a memory for the project.</p>
+      </div>
+
+      <!-- UNIT 21 -->
+      <section class="unit" id="u21">
+        <div class="unit-head"><span class="unit-num">21</span><h3>One binary</h3><span class="markers">🎁 🔍</span></div>
+        <p class="oneline"><strong>In one line:</strong> The whole app — UI and API — compiled into a single runnable file.</p>
+        <p class="goal">🎯 <strong>Goal:</strong> A double-clickable program.</p>
+
+        <p>Build the web app, embed the output right into the Go program, and serve it from the same server as the API. One process, one origin — no cross-origin config, no separate frontend deploy.</p>
+        <pre><code>//go:embed all:web/dist
+var webFS embed.FS</code></pre>
+        <p>Start by swapping the earlier disk-based migration loading for the embedded version — a small diff against working code, which is the easiest way in.</p>
+
+        <div class="callout concept">
+          <span class="tag">🧠 Learn this</span>
+          <ul style="margin:.2rem 0 0">
+            <li>Files can be compiled <em>into</em> the executable.</li>
+            <li><strong>Serving a single-page app:</strong> unknown paths must return the app's <code>index.html</code>, not a 404, or refreshing on a deep link breaks. Classic bug. You'll hit it.</li>
+            <li><strong>Build order:</strong> the web build must run <em>before</em> the Go build, because embedding reads the folder at compile time.</li>
+          </ul>
+        </div>
+
+        <div class="callout critical">
+          <span class="tag">⚠️ Don't skim past this — commit a placeholder</span>
+          <p>The web build folder is normally git-ignored, but embedding <strong>fails the build</strong> if the folder is empty. So on a fresh clone, the program won't even <em>compile</em> until someone runs the web build. Fix: commit a placeholder <code>index.html</code> (with a "run the build" message) so the embed pattern always matches something. This is a perfect entry for the project-memory file in Unit 23.</p>
+        </div>
+
+        <div class="callout">
+          <span class="tag">🧠 Why this is remarkable</span>
+          <p>No runtime to install, no dependencies to ship, no container required. Copy one file, run it. Most stacks cannot do this.</p>
+        </div>
+
+        <p class="ends"><strong>Ends with:</strong> a double-clickable program. Commit. 🎁</p>
+      </section>
+
+      <!-- UNIT 22 -->
+      <section class="unit" id="u22">
+        <div class="unit-head"><span class="unit-num">22</span><h3>CI, and deploying</h3></div>
+        <p class="oneline"><strong>In one line:</strong> A machine that builds and tests every push — plus optional real hosting.</p>
+        <p class="goal">🎯 <strong>Goal:</strong> Automated checks on every push.</p>
+
+        <div class="callout critical">
+          <span class="tag">⚠️ Don't skim past this — the CI step order is load-bearing</span>
+          <p>Frontend build <strong>first</strong>:</p>
+          <pre style="margin:.5rem 0"><code>npm ci && npm run build   (in web/)
+go vet ./...
+go test ./...
+go build</code></pre>
+          <p>The Go steps both compile the package, so they hit the embed directive — put them before the web build and they fail with "no matching files found" before the frontend even exists. Knowing a rule and encoding it are different things, which is itself part of the Unit 23 lesson.</p>
+        </div>
+
+        <h5>Deploying is optional</h5>
+        <div class="grid2">
+          <div class="mini"><h4>Don't</h4><p>Run it locally. Honestly fine for a personal app, and it keeps the single-file database story simple.</p></div>
+          <div class="mini"><h4>A small host</h4><p>Somewhere with a persistent disk (the database is a file that must survive restarts). Check pricing first.</p></div>
+          <div class="mini"><h4>A home machine + VPN</h4><p>Reachable from your phone and nowhere else.</p></div>
+        </div>
+
+        <div class="callout decision">
+          <span class="tag">🔑 SQLite's honest constraint</span>
+          <p>The database is a <em>file on a disk</em> — so it lives on one machine, on a volume that survives restarts. That's the trade you made back in Unit 6: enormous simplicity locally, real limits when scaling out. Naming the trade honestly beats pretending it isn't there. And back up before you care: the CLI has a one-command backup.</p>
+        </div>
+
+        <p class="ends"><strong>Ends with:</strong> green CI. Commit.</p>
+      </section>
+
+      <!-- UNIT 23 -->
+      <section class="unit" id="u23">
+        <div class="unit-head"><span class="unit-num">23</span><h3>Project memory</h3><span class="markers">🧱</span></div>
+        <p class="oneline"><strong>In one line:</strong> Write the document that makes the project maintainable after you've forgotten all of it.</p>
+        <p class="goal">🎯 <strong>Goal:</strong> A living project-memory file, and a real README.</p>
+
+        <div class="callout concept">
+          <span class="tag">🧠 What a project-memory file actually contains</span>
+          <p>Not generic boilerplate — an operational memory with discipline:</p>
+          <ul style="margin:.3rem 0 0">
+            <li><strong>Decisions marked settled</strong>, with a "don't re-litigate this" flag.</li>
+            <li><strong>Dates and commit references</strong> for why things are the way they are.</li>
+            <li><strong>Near-misses recorded, with their cost.</strong> What almost went wrong is more valuable than what went right.</li>
+            <li><strong>Dead code named</strong>, with a date and "ask before deleting."</li>
+          </ul>
+        </div>
+
+        <p>Write yours with: the tables and why they're shaped that way; the delete-cascade decision; the driver choice and its <code>"sqlite"</code>-not-<code>"sqlite3"</code> name; why the pragmas live in the connection string; the embed placeholder and what breaks without it; the CI step order; the scoring weights and what you learned tuning them; and every gotcha this course made you hit.</p>
+
+        <div class="callout">
+          <span class="tag">🧠 The point</span>
+          <p>Documentation as <em>memory</em>, not ceremony. The audience is you, in eight months, having forgotten everything. Writing down <em>why</em> is worth ten times writing down <em>what</em> — the code already says what.</p>
+        </div>
+
+        <p class="ends"><strong>Ends with:</strong> a project-memory file and a real README. Commit.</p>
+      </section>
+
+      <!-- COURSE MAP -->
+      <section class="panel" id="map">
+        <h2 style="margin:.1rem 0 .8rem; font-size:1.5rem">Course map</h2>
+        <table>
+          <thead><tr><th>#</th><th>Unit</th><th></th><th>Teaches</th></tr></thead>
+          <tbody>
+            <tr><td>0</td><td>Tools</td><td>🧱</td><td>PATH, compilers, package managers</td></tr>
+            <tr><td>1</td><td>Git &amp; GitHub</td><td>🧱</td><td>Commits, branches, pull requests</td></tr>
+            <tr><td>2</td><td>Go, part 1</td><td>🧱</td><td>Syntax, structs, errors-as-values</td></tr>
+            <tr><td>3</td><td>Schema design</td><td>🧱 🔍</td><td>Keys, relations, cascade, normalization</td></tr>
+            <tr><td>4</td><td>SQL hands-on</td><td>🧱</td><td>Joins, transactions, indexes</td></tr>
+            <tr><td>5</td><td>Go, part 2</td><td>🧱 🔍</td><td><strong>Pointers</strong>, defer, methods, interfaces, closures</td></tr>
+            <tr><td>6</td><td>Go + SQLite</td><td>🌉 🔍</td><td>Database access, the connection string, scanning</td></tr>
+            <tr><td>7</td><td>When it breaks</td><td>🧱</td><td>Errors, panics, debugger, docs, getting unstuck</td></tr>
+            <tr><td>8</td><td>Migrations</td><td>🔍</td><td>Schema history, append-only</td></tr>
+            <tr><td>9</td><td>HTTP server</td><td>🧱</td><td>Requests, routing, concurrency</td></tr>
+            <tr><td>10</td><td>Read API</td><td>🌉 🔍</td><td>REST, JSON, the interface seam</td></tr>
+            <tr><td>11</td><td>Write API</td><td>🌉 🔍</td><td>Transactions, nested writes, geometry</td></tr>
+            <tr><td>12</td><td>Update API</td><td>🔍</td><td>Full vs partial updates, pointers-as-optional</td></tr>
+            <tr><td>13</td><td>Hardening</td><td></td><td>Validation, error mapping, middleware</td></tr>
+            <tr><td>14</td><td>Tests</td><td>🧱</td><td>Automated tests, race detection, merge conflicts</td></tr>
+            <tr><td>15</td><td>UI scaffold</td><td>🎁</td><td>React, the build tool, the design tokens</td></tr>
+            <tr><td>16</td><td>Wiring it up</td><td>🌉 🎁</td><td>Fetch, async, the full round trip</td></tr>
+            <tr><td>17</td><td>Tags &amp; walks</td><td></td><td>Many-to-many, a full vertical slice</td></tr>
+            <tr><td>18</td><td>Weather</td><td>🎁</td><td>HTTP clients, timeouts, locking a cache</td></tr>
+            <tr><td>19</td><td>Suggestions</td><td>🎁</td><td>Business logic, scoring, explainability</td></tr>
+            <tr><td>20</td><td>Suggestion UI</td><td>🎁</td><td>Designing for the real context</td></tr>
+            <tr><td>21</td><td>One binary</td><td>🎁 🔍</td><td>Embedding, serving a single-page app</td></tr>
+            <tr><td>22</td><td>CI &amp; deploy</td><td></td><td>Automated checks, the single-file constraint</td></tr>
+            <tr><td>23</td><td>Project memory</td><td>🧱</td><td>Documentation as memory</td></tr>
+          </tbody>
+        </table>
+        <a class="top" href="#how">↑ back to top</a>
+      </section>
+
+      <!-- OLDER LANGUAGE -->
+      <section class="panel" id="older">
+        <h2 style="margin:.1rem 0 .6rem; font-size:1.5rem">Coming from an older or procedural language?</h2>
+        <p>Here's what tends to feel strangest, in rough order — and, encouragingly, what tends to feel easier than people warn you.</p>
+        <div class="grid2">
+          <div class="mini">
+            <h4>The walls, in order</h4>
+            <p><strong>1. Pointers.</strong> The one with the fewest analogues in older languages, and the reason Unit 5 exists. When it feels abstract, open the debugger and <em>watch</em> it. This is the wall; after it, much is downhill.<br><br>
+            <strong>2. Interfaces.</strong> A type as a promise about behaviour, not a description of a thing.<br><br>
+            <strong>3. SQL being declarative.</strong> You describe the answer, not the loop.<br><br>
+            <strong>4. Async.</strong> Code that continues before it has an answer.<br><br>
+            <strong>5. Errors as return values.</strong> No exceptions — just a value you check.<br><br>
+            <strong>6. Everything is a text file in version control.</strong> No librarian, no checkout lock. Branches are free; nothing is ever really lost.</p>
+          </div>
+          <div class="mini">
+            <h4>The things that come easier</h4>
+            <p>Static typing — you already think this way. Structs — they're records. Transactions — you already know why they matter. And caring about data integrity — most people learn that late; a data background learns it first.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- LATER -->
+      <section class="panel" id="later">
+        <h2 style="margin:.1rem 0 .6rem; font-size:1.5rem">What comes later</h2>
+        <p>Deliberately vague — you'll know more by the time you get here, and the right design will be obvious then, not now.</p>
+        <p><span class="pill">Maps</span> Draw a path by clicking; the points flow into the geometry table that's been collecting real data since Unit 16. Markers for features. Concepts: mapping libraries, geographic data formats, tile servers.</p>
+        <p><span class="pill">Phone GPS</span> Record a walk from a phone. Concepts: installable web apps and offline support, the browser location API, syncing captured tracks, smoothing GPS noise.</p>
+        <p><span class="pill">A different database</span> Swap SQLite for a client/server database — the store interface makes this a lesson, not a rewrite. Proving that claim is itself worth doing.</p>
+        <p><span class="pill">Multiple users</span> Accounts, sessions, "whose paths are these?" Big, deliberately deferred.</p>
+        <p><span class="pill">Import from fitness apps</span> Third-party sign-in, other people's APIs and data models.</p>
+      </section>
+
+      <footer>
+        <p><strong>Build a Walking-Paths App</strong> — a self-paced training project in Go, SQLite, and React. Free to copy, adapt, and host. There is no fixed schedule: work through it when it suits you, and treat "the app still runs" — not the number of the unit — as your measure of progress.</p>
+      </footer>
+
+    </main>
+  </div>
+</div>
+
+<script>
+  (function(){
+    var root = document.documentElement;
+    var btn = document.getElementById('themeToggle');
+    function current(){
+      return root.getAttribute('data-theme') ||
+        (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    }
+    btn.addEventListener('click', function(){
+      var next = current() === 'dark' ? 'light' : 'dark';
+      root.setAttribute('data-theme', next);
+    });
+  })();
+</script>
+</body>
+</html>
