@@ -46,32 +46,6 @@ matter — if you read nothing else on a page, read the callouts.
 
 ---
 
-## Working with a partner *(optional)*
-
-You can do this solo. But it works well as a two-person project, and a few habits keep
-pairing from turning into one person typing while the other watches.
-
-- **Driver / navigator.** One person types, the other reads every line aloud and questions
-  it. The person *explaining* the code usually learns it more deeply than the one typing.
-- **Rotate the keyboard every 25 minutes.** Hard stop, even mid-function. The one thing
-  that stops the roles calcifying into "typist" and "audience".
-- **Split the work at an interface.** From the API phase on, one person can own the data
-  layer (store, SQL) and the other the HTTP handlers. They meet at a shared interface —
-  which is the whole point of designing one.
-- **Write the tests for each other's code.** The highest-comprehension reading exercise
-  there is.
-- **Do a couple of units solo, as pull requests.** The UI scaffold and the weather client
-  touch nothing else, so they're ideal to build alone on a branch and have the other
-  person review — a real review, of code they didn't watch appear.
-
-> ⚠️ **Don't skim past this — the AI rule.** You will paste compile errors into an AI
-> assistant. That's fine — as a tool for *explaining* an error or *reviewing* code you
-> wrote. Never let it type the code for you. The entire value of this course is your own
-> hands on the keys building the mental model. Outsource that and you finish with an app
-> and no skill.
-
----
-
 ## What you're building
 
 A **single program** that:
@@ -567,7 +541,7 @@ right when you have a backlog of confusion to spend on them.
 > ladder helps more than it sounds like it would, especially late at night when there's no
 > one at the next desk.
 
-**Ends with:** a README section with the ladder and the AI rule. Commit.
+**Ends with:** a README section with your stuck-ladder. Commit.
 
 ---
 
@@ -674,11 +648,6 @@ areas (and two people) work without colliding.
 > why a future "swap the database engine" is a lesson and not a rewrite — and why you can
 > test each half without the other.
 
-> 🧠 **An interface is a contract between two workers.** If you're pairing, this is the
-> natural split: one person owns the store (SQL, scanning, transactions), the other owns the
-> handlers (status codes, JSON, validation). Agree the interface first, then work against it
-> — and review each other's side, since neither watched the other type.
-
 > 🧠 **Learn this.**
 > - **Struct tags:** a small annotation maps a Go field name to the JSON name the frontend
 >   wants. Go and JavaScript disagree about naming; the tag is the translator.
@@ -783,8 +752,8 @@ while it's safe.
    familiar before the weather cache needs it.
 
 > ✅ **Manufacture a merge conflict on purpose.** Two branches edit the same function; merge
-> them. Resolve it together. Conflicts are terrifying exactly once, and only if the first one
-> is real and urgent — meet `<<<<<<< HEAD` on a quiet afternoon in a safe branch instead.
+> them and resolve the clash. Conflicts are terrifying exactly once, and only if the first
+> one is real and urgent — meet `<<<<<<< HEAD` on a quiet afternoon in a safe branch instead.
 > Note that dependency lock files are conflict magnets.
 
 **Ends with:** the suite passes, with and without race detection. Commit.
@@ -797,8 +766,7 @@ while it's safe.
 
 ## Unit 15 — UI scaffold 🎁
 
-**In one line:** A React app with a tiny, deliberate design system — a good solo,
-pull-request unit.
+**In one line:** A React app with a tiny, deliberate design system.
 
 🎯 **Goal:** A styled page, no data yet.
 
@@ -827,7 +795,7 @@ cd web && npm install && npm run dev
 > attribute names, curly braces for expressions, one root element). What the build tool
 > does. And why theming through CSS variables is nearly free.
 
-**Ends with:** a styled page, no data. If pairing, merge it as a reviewed pull request.
+**Ends with:** a styled page, no data. Commit.
 
 ---
 
@@ -882,7 +850,7 @@ Add tag chips on the card, a tag filter on the list, and features (garbage cans,
 parking) with their coordinates.
 
 > ⚠️ **Don't skip the walk log.** Add an "I walked this" button → one POST → one insert. It's
-> the smallest complete vertical slice, so it's the ideal thing to build solo, unaided,
+> the smallest complete vertical slice, so it's the ideal thing to build end-to-end yourself,
 > through every layer. It's also load-bearing: the suggestion engine scores on walk history.
 > With no writer, that table stays empty forever and two scoring rules silently do nothing —
 > they'd *look* alive and be dead.
@@ -900,7 +868,7 @@ parking) with their coordinates.
 **In one line:** Go fetches the weather — the client side of API work, and where the data
 race from Unit 9 finally shows up.
 
-🎯 **Goal:** A weather endpoint, race-free. A good solo, pull-request unit.
+🎯 **Goal:** A weather endpoint, race-free.
 
 Use **Open-Meteo** — no key, no account. Paste the URL in a browser first and read the JSON:
 
@@ -932,7 +900,7 @@ https://api.open-meteo.com/v1/forecast?latitude=42.36&longitude=-71.06
 > - **Graceful degradation** 🔑 — if the weather call fails, the app must still suggest
 >   walks, just without weather input. A dependency being down is not an excuse to be down.
 
-**Ends with:** a weather endpoint, race-free. If pairing, merge as a reviewed pull request.
+**Ends with:** a weather endpoint, race-free. Commit.
 
 ---
 

@@ -233,7 +233,6 @@
           <summary>Contents</summary>
           <h4>Start here</h4>
           <a href="#how">How to use this guide</a>
-          <a href="#pairing">Working with a partner</a>
           <a href="#what">What you're building</a>
           <a href="#stack">The stack</a>
           <h4>Phase 0 · Setup</h4>
@@ -308,23 +307,6 @@
         <div class="callout critical">
           <span class="tag">⚠️ No throwaway exercises</span>
           <p><strong>Everything you build accrues to the app.</strong> There is no "learn it in a sandbox, then start the real thing" — the first Go you write is the app's real domain code, and the first SQL you write is the app's real schema. Each unit's practice <em>is</em> a piece of the walking app, so nothing is wasted and every session leaves the product further along.</p>
-        </div>
-      </section>
-
-      <!-- PAIRING -->
-      <section class="panel" id="pairing">
-        <h2 style="margin:.1rem 0 .6rem; font-size:1.5rem">Working with a partner <span style="font-size:.8rem; color:var(--muted); font-weight:400">(optional)</span></h2>
-        <p>You can do this solo. But it works beautifully as a two-person project, and a few habits make pairing pay off instead of turning into one person typing while the other watches.</p>
-        <ul>
-          <li><strong>Driver / navigator.</strong> One person types, the other reads every line aloud and questions it. The person <em>explaining</em> the code usually learns it more deeply than the person typing.</li>
-          <li><strong>Rotate the keyboard every 25 minutes.</strong> Hard stop, even mid-function. This is the single thing that stops the roles calcifying into "typist" and "audience."</li>
-          <li><strong>Split the work at an interface.</strong> From the API phase on, one person can own the data layer (the store, the SQL) and the other the HTTP handlers. They meet at a shared interface — which is the whole point of designing one.</li>
-          <li><strong>Write the tests for each other's code.</strong> Writing a test for a function someone else wrote is the highest-comprehension reading exercise there is.</li>
-          <li><strong>Do a couple of units solo, as pull requests.</strong> The UI scaffold and the weather client touch nothing else, so they're ideal to build alone on a branch and have the other person review — a real review, of code they didn't watch appear.</li>
-        </ul>
-        <div class="callout critical">
-          <span class="tag">⚠️ Don't skim past this</span>
-          <p><strong>The AI rule.</strong> You will paste compile errors into an AI assistant. That's fine — as a tool for <em>explaining</em> an error or <em>reviewing</em> code you wrote. Never let it type the code for you. The entire value of this course is your own hands on the keys building the mental model. Outsource that and you finish with an app and no skill.</p>
         </div>
       </section>
 
@@ -767,7 +749,7 @@ db, err := sql.Open("sqlite",
           <p>Something like: re-read the error aloud → check the docs → look at what you just changed (<code>git diff</code>) → use the debugger → explain it to someone (or a rubber duck) → walk away for 20 minutes → ask for help. Having a written ladder helps more than it sounds like it would, especially late at night when there's no one at the next desk.</p>
         </div>
 
-        <p class="ends"><strong>Ends with:</strong> a README section with the ladder and the AI rule. Commit.</p>
+        <p class="ends"><strong>Ends with:</strong> a README section with your stuck-ladder. Commit.</p>
       </section>
 
       <!-- UNIT 8 -->
@@ -860,11 +842,6 @@ store     (SQL: the only place that knows a database exists)
    ↓
 database</code></pre>
           <p>Handlers never write SQL. The store never touches the HTTP response. That single rule is why a future "swap the database engine" is a lesson and not a rewrite — and why you can test each half without the other.</p>
-        </div>
-
-        <div class="callout">
-          <span class="tag">🧠 An interface is a contract between two workers</span>
-          <p>If you're pairing, this is the natural split: one person owns the store (SQL, scanning, transactions), the other owns the handlers (status codes, JSON, validation). Agree the interface first, then work against it — and review each other's side, since neither watched the other type.</p>
         </div>
 
         <div class="callout concept">
@@ -965,7 +942,7 @@ database</code></pre>
 
         <div class="callout try">
           <span class="tag">✅ Manufacture a merge conflict on purpose</span>
-          <p>Two branches edit the same function; merge them. Resolve it together. Conflicts are terrifying exactly once, and only if the first one is real and urgent — meet <code>&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD</code> on a quiet afternoon in a sandbox instead. Note that dependency lock files are conflict magnets.</p>
+          <p>Create two branches that edit the same function, then merge them and resolve the clash. Conflicts are terrifying exactly once, and only if the first one is real and urgent — meet <code>&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD</code> on a quiet afternoon in a sandbox instead. Note that dependency lock files are conflict magnets.</p>
         </div>
 
         <p class="ends"><strong>Ends with:</strong> the suite passes, with and without race detection. Commit.</p>
@@ -981,7 +958,7 @@ database</code></pre>
       <!-- UNIT 15 -->
       <section class="unit" id="u15">
         <div class="unit-head"><span class="unit-num">15</span><h3>UI scaffold</h3><span class="markers">🎁</span></div>
-        <p class="oneline"><strong>In one line:</strong> A React app with a tiny, deliberate design system — a good solo, pull-request unit.</p>
+        <p class="oneline"><strong>In one line:</strong> A React app with a tiny, deliberate design system.</p>
         <p class="goal">🎯 <strong>Goal:</strong> A styled page, no data yet.</p>
 
         <pre><code>cd ~/WalkApp
@@ -1007,7 +984,7 @@ cd web && npm install && npm run dev</code></pre>
           <p>Components, props, and simple state. <strong>JSX is not HTML</strong> (different attribute names, curly braces for expressions, one root element). What the build tool does. And why theming through CSS variables is nearly free.</p>
         </div>
 
-        <p class="ends"><strong>Ends with:</strong> a styled page, no data. If pairing, merge it as a reviewed pull request.</p>
+        <p class="ends"><strong>Ends with:</strong> a styled page, no data. Commit.</p>
       </section>
 
       <!-- UNIT 16 -->
@@ -1052,7 +1029,7 @@ cd web && npm install && npm run dev</code></pre>
 
         <div class="callout critical">
           <span class="tag">⚠️ Don't skip the walk log</span>
-          <p>Add an "I walked this" button → one POST → one insert. It's the smallest complete vertical slice, so it's the ideal thing to build solo, unaided, through every layer. It's also load-bearing: the suggestion engine scores on walk history. With no writer, that table stays empty forever and two scoring rules silently do nothing — they'd <em>look</em> alive and be dead.</p>
+          <p>Add an "I walked this" button → one POST → one insert. It's the smallest complete vertical slice, so it's the ideal thing to build end-to-end yourself, through every layer. It's also load-bearing: the suggestion engine scores on walk history. With no writer, that table stays empty forever and two scoring rules silently do nothing — they'd <em>look</em> alive and be dead.</p>
         </div>
 
         <p class="ends"><strong>Ends with:</strong> tagging works, walks are logged. Commit.</p>
@@ -1069,7 +1046,7 @@ cd web && npm install && npm run dev</code></pre>
       <section class="unit" id="u18">
         <div class="unit-head"><span class="unit-num">18</span><h3>Consuming someone else's API</h3><span class="markers">🎁</span></div>
         <p class="oneline"><strong>In one line:</strong> Go fetches the weather — the client side of API work, and where the data race from Unit 9 finally shows up.</p>
-        <p class="goal">🎯 <strong>Goal:</strong> A weather endpoint, race-free. A good solo, pull-request unit.</p>
+        <p class="goal">🎯 <strong>Goal:</strong> A weather endpoint, race-free.</p>
 
         <p>Use <strong>Open-Meteo</strong> — no key, no account. Paste the URL in a browser first and read the JSON:</p>
         <pre><code>https://api.open-meteo.com/v1/forecast?latitude=42.36&longitude=-71.06
@@ -1098,7 +1075,7 @@ cd web && npm install && npm run dev</code></pre>
           </ul>
         </div>
 
-        <p class="ends"><strong>Ends with:</strong> a weather endpoint, race-free. If pairing, merge as a reviewed pull request.</p>
+        <p class="ends"><strong>Ends with:</strong> a weather endpoint, race-free. Commit.</p>
       </section>
 
       <!-- UNIT 19 -->
