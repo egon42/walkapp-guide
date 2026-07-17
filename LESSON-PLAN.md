@@ -48,15 +48,23 @@ matter — if you read nothing else on a page, read the callouts.
 
 ## What you're building
 
-A **single program** that:
+A **single Go program** that:
 
-- serves a web UI (compiled right into the program)
-- exposes a JSON API
-- stores everything in one database file beside it
-- calls a weather service to inform its suggestions
+- serves the web UI (compiled right into the program)
+- **provides** a JSON API — the endpoints your own UI calls to load and save paths
+- stores everything in one SQLite database file beside it
+- **consumes** outside APIs — a weather service now, a mapping service later — to inform
+  its suggestions
 
-You run it by double-clicking one file. That single-binary simplicity is much of why this
-stack was chosen.
+That whole program compiles to **one binary**, which you deploy to a small cloud host. You
+reach it at a single HTTPS URL and can install it on your phone's home screen like any app
+— the same feel as a hosted site, but with a real Go server and database behind it.
+
+> 🧠 **Two kinds of API — this trips everyone up.** "API" appears twice above, in opposite
+> roles. Your app **provides** an API: your React UI is the client that calls it to fetch
+> and save paths. Your app also **consumes** other people's APIs — the weather service, and
+> later a mapping service — where *your Go code* is the client calling out. You build both
+> sides in this course: the provider in Phase 2, the consumer in Phase 4.
 
 - **In scope:** paths entered by hand, tagged, browsable, plus a suggestion engine
   answering "where should I walk today?"
@@ -81,7 +89,7 @@ stack was chosen.
 | Frontend | React + Vite + TypeScript | A widely used, well-documented modern web stack. |
 | Styling | Hand-written CSS, ~12 custom properties | A tiny, legible design system you fully control. |
 | Weather | Open-Meteo | Free, no key, no signup, no billing. |
-| Hosting | Single binary; deploy optional | Runs locally first. |
+| Hosting | Single binary on a small cloud host | Runs locally in dev; deployed to one HTTPS URL and installable as a phone app (PWA). |
 
 ---
 
@@ -966,9 +974,10 @@ a leash.
 
 ## Unit 21 — One binary 🎁🔍
 
-**In one line:** The whole app — UI and API — compiled into a single runnable file.
+**In one line:** The whole app — UI and API — compiled into a single self-contained binary,
+the exact thing you'll deploy in Unit 22.
 
-🎯 **Goal:** A double-clickable program.
+🎯 **Goal:** One self-contained binary — run it locally now, ship it next unit.
 
 Build the web app, embed the output right into the Go program, and serve it from the same
 server as the API. One process, one origin — no cross-origin config, no separate frontend
@@ -995,18 +1004,21 @@ small diff against working code, which is the easiest way in.
 > `index.html` (with a "run the build" message) so the embed pattern always matches something.
 > This is a perfect entry for the project-memory file in Unit 23.
 
-> 🧠 **Why this is remarkable.** No runtime to install, no dependencies to ship, no container
-> required. Copy one file, run it. Most stacks cannot do this.
+> 🧠 **Why this is remarkable — and why it makes hosting easy.** No runtime to install on the
+> server, no `node_modules` to ship, no container required. You hand the host a single file
+> and it runs. Most stacks can't do this — and it's exactly why deploying in Unit 22 is short
+> instead of a saga.
 
-**Ends with:** a double-clickable program. Commit. 🎁
+**Ends with:** one binary that runs the whole app locally, ready to deploy. Commit. 🎁
 
 ---
 
-## Unit 22 — CI, and deploying
+## Unit 22 — CI, and going live 🎁🔍
 
-**In one line:** A machine that builds and tests every push — plus optional real hosting.
+**In one line:** A machine that builds and tests every push, and the app deployed to a real
+HTTPS URL you can open — and install — on your phone.
 
-🎯 **Goal:** Automated checks on every push.
+🎯 **Goal:** Green CI, and the app live on the web.
 
 > ⚠️ **Don't skim past this — the CI step order is load-bearing.** Frontend build **first**:
 > ```
@@ -1020,20 +1032,41 @@ small diff against working code, which is the easiest way in.
 > Knowing a rule and encoding it are different things, which is itself part of the Unit 23
 > lesson.
 
-**Deploying is optional:**
+**Deploy the binary to a small host.** Because the whole app is one self-contained binary
+(Unit 21), hosting is mostly "hand this file to a server that keeps it running." Pick a host
+that runs a persistent process *with a disk* — Fly.io and Render are the usual picks for a
+Go + SQLite app. They give you HTTPS automatically, so the phone-install step below just
+works.
 
-- **Don't.** Run it locally. Honestly fine for a personal app, and it keeps the single-file
-  database story simple.
-- **A small host.** Somewhere with a persistent disk (the database is a file that must
-  survive restarts). Check pricing first.
-- **A home machine + VPN.** Reachable from your phone and nowhere else.
+- **What you push up:** the single binary (or a tiny container that just copies it in and
+  runs it). No Node, no runtime, no dependencies to install on the server.
+- **What the host gives you:** a URL like `walkapp.fly.dev`, automatic HTTPS, and a
+  persistent volume where `walk.db` lives.
 
-> 🔑 **SQLite's honest constraint.** The database is a *file on a disk* — so it lives on one
-> machine, on a volume that survives restarts. That's the trade you made back in Unit 6:
-> enormous simplicity locally, real limits when scaling out. Naming the trade honestly beats
-> pretending it isn't there. And back up before you care: the CLI has a one-command backup.
+> ⚠️ **Don't skim past this — the #1 SQLite-hosting mistake.** Your database is a *file on
+> disk*. If that disk isn't a **persistent volume**, every deploy (and every restart) hands
+> you a fresh, empty disk — and all your paths are gone. On these hosts you must explicitly
+> attach a volume and point `walk.db` at it. This catches nearly everyone once; make sure it
+> catches you zero times.
 
-**Ends with:** green CI. Commit.
+> 🧠 **Make it installable — a PWA, like a real phone app.** To get the "Add to Home Screen"
+> behaviour of a native app, add two small static files, served by your Go binary alongside
+> the UI:
+> - a `manifest.webmanifest` — name, icons, colors, and `display: standalone` so it opens
+>   without browser chrome;
+> - a **service worker** — a tiny background script; registering one (even a near-empty one)
+>   is what makes the app installable, and it can cache the shell so the app opens instantly.
+>
+> HTTPS is required for both — which your host already provides. Open the URL on your phone,
+> "Add to Home Screen," and it lives next to your other apps.
+
+> 🔑 **SQLite's honest constraint.** A file-on-a-disk database means *one* instance, on *one*
+> volume. That's the trade you made in Unit 6: enormous simplicity, real limits if you ever
+> needed many servers. For a personal walking app that ceiling is miles away — but name the
+> trade honestly rather than pretend it isn't there. And back up before you care:
+> `sqlite3 walk.db ".backup backup.db"`, or snapshot the host's volume.
+
+**Ends with:** green CI, and the app live at a URL you can install on your phone. Commit. 🎁
 
 ---
 
@@ -1091,7 +1124,7 @@ scoring weights and what you learned tuning them; and every gotcha this course m
 | 19 | Suggestions | 🎁 | Business logic, scoring, explainability |
 | 20 | Suggestion UI | 🎁 | Designing for the real context |
 | 21 | One binary | 🎁🔍 | Embedding, serving a single-page app |
-| 22 | CI & deploy | | Automated checks, the single-file constraint |
+| 22 | CI & going live | 🎁🔍 | Deploy the binary, persistent disk, PWA install |
 | 23 | Project memory | 🧱 | Documentation as memory |
 
 ---
@@ -1121,11 +1154,15 @@ about data integrity (most people learn that late; a data background learns it f
 Deliberately vague — you'll know more by the time you get here, and the right design will be
 obvious then, not now.
 
-- **Maps.** Draw a path by clicking; the points flow into the geometry table that's been
-  collecting real data since Unit 16. Markers for features. Concepts: mapping libraries,
-  geographic data formats, tile servers.
-- **Phone GPS.** Record a walk from a phone. Concepts: installable web apps and offline
-  support, the browser location API, syncing captured tracks, smoothing GPS noise.
+- **Maps.** Draw a path by clicking instead of typing coordinates; the points flow into the
+  geometry table that's been collecting real data since Unit 16. Markers for features. This
+  adds another *consumed* API — a mapping/tiles service. **OpenStreetMap** via the **Leaflet**
+  library is free and needs no key or billing, so it's the easy way in; **Google Maps** works
+  too but requires an API key and a billing account. Concepts: mapping libraries, geographic
+  data formats, tile servers.
+- **Phone GPS.** Record a walk from a phone, building on the installable-PWA foundation from
+  Unit 22. Concepts: offline capture and background sync, the browser location API, smoothing
+  GPS noise.
 - **A different database.** Swap SQLite for a client/server database — the store interface
   makes this a lesson, not a rewrite. Proving that claim is itself worth doing.
 - **Multiple users.** Accounts, sessions, "whose paths are these?" Big, deliberately

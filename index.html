@@ -263,7 +263,7 @@
           <a href="#u20">20 · Suggestion UI</a>
           <h4>Phase 5 · Ship it</h4>
           <a href="#u21">21 · One binary</a>
-          <a href="#u22">22 · CI &amp; deploy</a>
+          <a href="#u22">22 · CI &amp; going live</a>
           <a href="#u23">23 · Project memory</a>
           <h4>Reference</h4>
           <a href="#map">Course map</a>
@@ -314,14 +314,19 @@
       <section class="panel" id="what">
         <h2 style="margin:.1rem 0 .6rem; font-size:1.5rem">What you're building</h2>
         <p>A tool for cataloguing walking paths by what they're <em>good for</em> — shade, garbage cans, closed loops, parking, dog-friendliness — that then suggests where to walk today based on your mood, the weather, and your criteria.</p>
-        <p>Technically, it's a <strong>single program</strong> that:</p>
+        <p>Technically, it's a <strong>single Go program</strong> that:</p>
         <ul>
-          <li>serves a web UI (compiled right into the program)</li>
-          <li>exposes a JSON API</li>
-          <li>stores everything in one database file beside it</li>
-          <li>calls a weather service to inform its suggestions</li>
+          <li>serves the web UI (compiled right into the program)</li>
+          <li><strong>provides</strong> a JSON API — the endpoints your own UI calls to load and save paths</li>
+          <li>stores everything in one SQLite database file beside it</li>
+          <li><strong>consumes</strong> outside APIs — a weather service now, a mapping service later — to inform its suggestions</li>
         </ul>
-        <p>You run it by double-clicking one file. That single-binary simplicity is much of why this stack was chosen.</p>
+        <p>That whole program compiles to <strong>one binary</strong>, which you deploy to a small cloud host. You reach it at a single HTTPS URL and can install it on your phone's home screen like any app — the same feel as a hosted site, but with a real Go server and database behind it.</p>
+
+        <div class="callout concept">
+          <span class="tag">🧠 Two kinds of API — this trips everyone up</span>
+          <p>"API" appears twice above, in opposite roles. Your app <strong>provides</strong> an API: your React UI is the client that calls it to fetch and save paths. Your app also <strong>consumes</strong> other people's APIs — the weather service, and later a mapping service — where <em>your Go code</em> is the client calling out. You build both sides in this course: the provider in Phase 2, the consumer in Phase 4.</p>
+        </div>
 
         <div class="grid2">
           <div class="mini"><h4>In scope</h4><p>Paths entered by hand, tagged, browsable, plus a suggestion engine answering "where should I walk today?"</p></div>
@@ -348,7 +353,7 @@
             <tr><td>Frontend</td><td>React + Vite + TypeScript</td><td>A widely used, well-documented modern web stack.</td></tr>
             <tr><td>Styling</td><td>Hand-written CSS, ~12 custom properties</td><td>A tiny, legible design system you fully control.</td></tr>
             <tr><td>Weather</td><td>Open-Meteo</td><td>Free, no key, no signup, no billing.</td></tr>
-            <tr><td>Hosting</td><td>Single binary; deploy optional</td><td>Runs locally first.</td></tr>
+            <tr><td>Hosting</td><td>Single binary on a small cloud host</td><td>Runs locally in dev; deployed to one HTTPS URL and installable as a phone app (PWA).</td></tr>
           </tbody>
         </table>
         <a class="top" href="#how">↑ back to top</a>
@@ -1136,8 +1141,8 @@ Output: paths, ranked, each with a reason</code></pre>
       <!-- UNIT 21 -->
       <section class="unit" id="u21">
         <div class="unit-head"><span class="unit-num">21</span><h3>One binary</h3><span class="markers">🎁 🔍</span></div>
-        <p class="oneline"><strong>In one line:</strong> The whole app — UI and API — compiled into a single runnable file.</p>
-        <p class="goal">🎯 <strong>Goal:</strong> A double-clickable program.</p>
+        <p class="oneline"><strong>In one line:</strong> The whole app — UI and API — compiled into a single self-contained binary, the exact thing you'll deploy in Unit 22.</p>
+        <p class="goal">🎯 <strong>Goal:</strong> One self-contained binary — run it locally now, ship it next unit.</p>
 
         <p>Build the web app, embed the output right into the Go program, and serve it from the same server as the API. One process, one origin — no cross-origin config, no separate frontend deploy.</p>
         <pre><code>//go:embed all:web/dist
@@ -1159,18 +1164,18 @@ var webFS embed.FS</code></pre>
         </div>
 
         <div class="callout">
-          <span class="tag">🧠 Why this is remarkable</span>
-          <p>No runtime to install, no dependencies to ship, no container required. Copy one file, run it. Most stacks cannot do this.</p>
+          <span class="tag">🧠 Why this is remarkable — and why it makes hosting easy</span>
+          <p>No runtime to install on the server, no <code>node_modules</code> to ship, no container required. You hand the host a single file and it runs. Most stacks can't do this — and it's exactly why deploying in Unit 22 is short instead of a saga.</p>
         </div>
 
-        <p class="ends"><strong>Ends with:</strong> a double-clickable program. Commit. 🎁</p>
+        <p class="ends"><strong>Ends with:</strong> one binary that runs the whole app locally, ready to deploy. Commit. 🎁</p>
       </section>
 
       <!-- UNIT 22 -->
       <section class="unit" id="u22">
-        <div class="unit-head"><span class="unit-num">22</span><h3>CI, and deploying</h3></div>
-        <p class="oneline"><strong>In one line:</strong> A machine that builds and tests every push — plus optional real hosting.</p>
-        <p class="goal">🎯 <strong>Goal:</strong> Automated checks on every push.</p>
+        <div class="unit-head"><span class="unit-num">22</span><h3>CI, and going live</h3><span class="markers">🎁 🔍</span></div>
+        <p class="oneline"><strong>In one line:</strong> A machine that builds and tests every push, and the app deployed to a real HTTPS URL you can open — and install — on your phone.</p>
+        <p class="goal">🎯 <strong>Goal:</strong> Green CI, and the app live on the web.</p>
 
         <div class="callout critical">
           <span class="tag">⚠️ Don't skim past this — the CI step order is load-bearing</span>
@@ -1182,19 +1187,34 @@ go build</code></pre>
           <p>The Go steps both compile the package, so they hit the embed directive — put them before the web build and they fail with "no matching files found" before the frontend even exists. Knowing a rule and encoding it are different things, which is itself part of the Unit 23 lesson.</p>
         </div>
 
-        <h5>Deploying is optional</h5>
+        <h5>Deploy the binary to a small host</h5>
+        <p>Because the whole app is one self-contained binary (Unit 21), hosting is mostly "hand this file to a server that keeps it running." Pick a host that runs a persistent process <em>with a disk</em> — Fly.io and Render are the usual picks for a Go + SQLite app. They give you HTTPS automatically, so the phone-install step below just works.</p>
         <div class="grid2">
-          <div class="mini"><h4>Don't</h4><p>Run it locally. Honestly fine for a personal app, and it keeps the single-file database story simple.</p></div>
-          <div class="mini"><h4>A small host</h4><p>Somewhere with a persistent disk (the database is a file that must survive restarts). Check pricing first.</p></div>
-          <div class="mini"><h4>A home machine + VPN</h4><p>Reachable from your phone and nowhere else.</p></div>
+          <div class="mini"><h4>What you push up</h4><p>The single binary (or a tiny container that just copies it in and runs it). No Node, no runtime, no dependencies to install on the server.</p></div>
+          <div class="mini"><h4>What the host gives you</h4><p>A URL like <code>walkapp.fly.dev</code>, automatic HTTPS, and a persistent volume where <code>walk.db</code> lives.</p></div>
+        </div>
+
+        <div class="callout critical">
+          <span class="tag">⚠️ Don't skim past this — the #1 SQLite-hosting mistake</span>
+          <p>Your database is a <em>file on disk</em>. If that disk isn't a <strong>persistent volume</strong>, every deploy (and every restart) hands you a fresh, empty disk — and all your paths are gone. On these hosts you must explicitly attach a volume and point <code>walk.db</code> at it. This catches nearly everyone once; make sure it catches you zero times.</p>
+        </div>
+
+        <div class="callout concept">
+          <span class="tag">🧠 Make it installable — a PWA, like a real phone app</span>
+          <p>To get the "Add to Home Screen" behaviour of a native app (this is exactly how a lot of hosted web apps feel installable), add two small static files, served by your Go binary alongside the UI:</p>
+          <ul style="margin:.3rem 0 0">
+            <li>a <code>manifest.webmanifest</code> — name, icons, colors, and <code>display: standalone</code> so it opens without browser chrome;</li>
+            <li>a <strong>service worker</strong> — a tiny script the browser runs in the background; registering one (even a near-empty one) is what makes the app installable, and it can cache the shell so the app opens instantly.</li>
+          </ul>
+          <p>HTTPS is required for both — which your host already provides. Open the URL on your phone, "Add to Home Screen," and it lives next to your other apps.</p>
         </div>
 
         <div class="callout decision">
           <span class="tag">🔑 SQLite's honest constraint</span>
-          <p>The database is a <em>file on a disk</em> — so it lives on one machine, on a volume that survives restarts. That's the trade you made back in Unit 6: enormous simplicity locally, real limits when scaling out. Naming the trade honestly beats pretending it isn't there. And back up before you care: the CLI has a one-command backup.</p>
+          <p>A file-on-a-disk database means <em>one</em> instance, on <em>one</em> volume. That's the trade you made in Unit 6: enormous simplicity, real limits if you ever needed many servers. For a personal walking app that ceiling is miles away — but name the trade honestly rather than pretend it isn't there. And back up before you care: <code>sqlite3 walk.db ".backup backup.db"</code>, or snapshot the host's volume.</p>
         </div>
 
-        <p class="ends"><strong>Ends with:</strong> green CI. Commit.</p>
+        <p class="ends"><strong>Ends with:</strong> green CI, and the app live at a URL you can install on your phone. Commit. 🎁</p>
       </section>
 
       <!-- UNIT 23 -->
@@ -1252,7 +1272,7 @@ go build</code></pre>
             <tr><td>19</td><td>Suggestions</td><td>🎁</td><td>Business logic, scoring, explainability</td></tr>
             <tr><td>20</td><td>Suggestion UI</td><td>🎁</td><td>Designing for the real context</td></tr>
             <tr><td>21</td><td>One binary</td><td>🎁 🔍</td><td>Embedding, serving a single-page app</td></tr>
-            <tr><td>22</td><td>CI &amp; deploy</td><td></td><td>Automated checks, the single-file constraint</td></tr>
+            <tr><td>22</td><td>CI &amp; going live</td><td>🎁🔍</td><td>Deploy the binary, persistent disk, PWA install</td></tr>
             <tr><td>23</td><td>Project memory</td><td>🧱</td><td>Documentation as memory</td></tr>
           </tbody>
         </table>
@@ -1284,8 +1304,8 @@ go build</code></pre>
       <section class="panel" id="later">
         <h2 style="margin:.1rem 0 .6rem; font-size:1.5rem">What comes later</h2>
         <p>Deliberately vague — you'll know more by the time you get here, and the right design will be obvious then, not now.</p>
-        <p><span class="pill">Maps</span> Draw a path by clicking; the points flow into the geometry table that's been collecting real data since Unit 16. Markers for features. Concepts: mapping libraries, geographic data formats, tile servers.</p>
-        <p><span class="pill">Phone GPS</span> Record a walk from a phone. Concepts: installable web apps and offline support, the browser location API, syncing captured tracks, smoothing GPS noise.</p>
+        <p><span class="pill">Maps</span> Draw a path by clicking instead of typing coordinates; the points flow into the geometry table that's been collecting real data since Unit 16. Markers for features. This adds another <em>consumed</em> API — a mapping/tiles service. <strong>OpenStreetMap</strong> via the <strong>Leaflet</strong> library is free and needs no key or billing, so it's the easy way in; <strong>Google Maps</strong> works too but requires an API key and a billing account. Concepts: mapping libraries, geographic data formats, tile servers.</p>
+        <p><span class="pill">Phone GPS</span> Record a walk from a phone, building on the installable-PWA foundation from Unit 22. Concepts: offline capture and background sync, the browser location API, smoothing GPS noise.</p>
         <p><span class="pill">A different database</span> Swap SQLite for a client/server database — the store interface makes this a lesson, not a rewrite. Proving that claim is itself worth doing.</p>
         <p><span class="pill">Multiple users</span> Accounts, sessions, "whose paths are these?" Big, deliberately deferred.</p>
         <p><span class="pill">Import from fitness apps</span> Third-party sign-in, other people's APIs and data models.</p>
