@@ -624,6 +624,41 @@ sqlite3 walk.db                                       # open it and explore</cod
           <li><strong>SELECT</strong> — start with everything, then narrow with <code>WHERE</code>, <code>ORDER BY</code>, <code>LIMIT</code>.</li>
         </ol>
 
+        <div class="callout concept">
+          <span class="tag">🧠 The exact syntax — CREATE, INSERT, SELECT</span>
+          <p>A normal table (note the foreign key with cascade) and the many-to-many join table (note the composite primary key):</p>
+          <pre><code>CREATE TABLE paths (
+  id          INTEGER PRIMARY KEY,          -- auto-numbers itself
+  name        TEXT    NOT NULL,
+  distance_mi REAL    NOT NULL,
+  is_loop     INTEGER NOT NULL DEFAULT 0,   -- SQLite has no bool; use 0/1
+  surface     TEXT,                         -- 'paved'|'trail'|'mixed'; may be NULL
+  created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE path_points (
+  id      INTEGER PRIMARY KEY,
+  path_id INTEGER NOT NULL REFERENCES paths(id) ON DELETE CASCADE,
+  seq     INTEGER NOT NULL,                 -- ordering; rows have no inherent order
+  lat     REAL    NOT NULL,
+  lon     REAL    NOT NULL
+);
+
+CREATE TABLE path_tags (            -- the many-to-many join
+  path_id INTEGER NOT NULL REFERENCES paths(id) ON DELETE CASCADE,
+  tag_id  INTEGER NOT NULL REFERENCES tags(id)  ON DELETE CASCADE,
+  PRIMARY KEY (path_id, tag_id)     -- a path can't carry the same tag twice
+);</code></pre>
+          <p>Putting data in, then reading it back:</p>
+          <pre><code>INSERT INTO paths (name, distance_mi, is_loop, surface)
+VALUES ('River Loop', 2.3, 1, 'paved');
+
+SELECT name, distance_mi FROM paths
+WHERE is_loop = 1 AND distance_mi &lt; 3
+ORDER BY distance_mi
+LIMIT 10;</code></pre>
+        </div>
+
         <div class="callout critical">
           <span class="tag">⚠️ Don't skim past this — two habits that save you</span>
           <ul style="margin:.2rem 0 0">
@@ -640,6 +675,53 @@ sqlite3 walk.db                                       # open it and explore</cod
           <li><strong>Prove the cascade</strong> — turn foreign keys on, delete a path, watch its points vanish. Turn them off, try again, watch the orphans survive.</li>
           <li><strong>Indexes</strong> — add one, then run <code>EXPLAIN QUERY PLAN</code> before and after. Watch <code>SCAN</code> become <code>SEARCH</code>. This is the "why is it slow" tool.</li>
         </ol>
+
+        <div class="callout concept">
+          <span class="tag">🧠 The exact syntax — joins, grouping, transactions, indexes</span>
+          <p><strong>INNER vs LEFT JOIN</strong> — paths with their tags. INNER drops paths that have no tags; LEFT keeps them with a NULL tag:</p>
+          <pre><code>-- INNER: only paths that HAVE at least one tag
+SELECT paths.name, tags.name AS tag
+FROM paths
+JOIN path_tags ON path_tags.path_id = paths.id
+JOIN tags      ON tags.id = path_tags.tag_id;
+
+-- LEFT: ALL paths; tag is NULL where a path has none
+SELECT paths.name, tags.name AS tag
+FROM paths
+LEFT JOIN path_tags ON path_tags.path_id = paths.id
+LEFT JOIN tags      ON tags.id = path_tags.tag_id;</code></pre>
+
+          <p><strong>GROUP BY</strong> — "how many garbage cans per path?" <code>COUNT</code> collapses each group to one row:</p>
+          <pre><code>SELECT paths.name, COUNT(features.id) AS bins
+FROM paths
+LEFT JOIN features
+  ON features.path_id = paths.id AND features.kind = 'garbage_can'
+GROUP BY paths.id
+ORDER BY bins DESC;</code></pre>
+
+          <p><strong>Transaction</strong> — both inserts land, or neither does:</p>
+          <pre><code>BEGIN;
+  INSERT INTO paths (name, distance_mi) VALUES ('River Loop', 2.3);
+  INSERT INTO path_points (path_id, seq, lat, lon)
+    VALUES (last_insert_rowid(), 0, 42.36, -71.06);
+COMMIT;          -- or ROLLBACK; to undo everything since BEGIN</code></pre>
+
+          <p><strong>Prove the cascade</strong> — deleting a path removes its points too (once FKs are on):</p>
+          <pre><code>PRAGMA foreign_keys = ON;      -- OFF by default in the sqlite3 shell!
+DELETE FROM paths WHERE name = 'River Loop';
+SELECT COUNT(*) FROM path_points;   -- that path's points are gone</code></pre>
+
+          <p><strong>Index + EXPLAIN QUERY PLAN</strong> — watch <code>SCAN</code> become <code>SEARCH</code>:</p>
+          <pre><code>EXPLAIN QUERY PLAN
+SELECT * FROM path_points WHERE path_id = 3;
+-- =&gt; SCAN path_points            (reads every row)
+
+CREATE INDEX idx_points_path ON path_points(path_id);
+
+EXPLAIN QUERY PLAN
+SELECT * FROM path_points WHERE path_id = 3;
+-- =&gt; SEARCH path_points USING INDEX idx_points_path (path_id=?)</code></pre>
+        </div>
 
         <div class="callout older">
           <span class="tag">💡 The big mental shift</span>
@@ -669,6 +751,46 @@ sqlite3 walk.db                                       # open it and explore</cod
           <li><strong>Packages</strong> — directories, import paths, how a multi-file program is laid out.</li>
           <li><strong>Adding dependencies</strong> — <code>go get</code> and what the lock file is for.</li>
         </ol>
+
+        <div class="callout concept">
+          <span class="tag">🧠 The exact syntax — what these look like in Go</span>
+          <p><strong>Pointers</strong> — <code>&amp;x</code> is "the address of x"; <code>*p</code> reads or writes through the pointer:</p>
+          <pre><code>func doubleIt(n *float64) { *n = *n * 2 }   // *n = the value n points at
+
+d := 2.3
+doubleIt(&amp;d)   // pass the ADDRESS, so the function can change d
+// d is now 4.6</code></pre>
+
+          <p><strong>Method + receiver, and an interface it satisfies</strong> — there's no <code>implements</code> keyword; matching the method is enough:</p>
+          <pre><code>type Path struct {
+    Name       string
+    DistanceMi float64
+}
+
+// (p Path) is the receiver: this method belongs to Path
+func (p Path) EstimateWalkTime(mph float64) time.Duration {
+    hours := p.DistanceMi / mph
+    return time.Duration(hours * float64(time.Hour))
+}
+
+// a Pacer is "anything that can estimate a walk time"
+type Pacer interface {
+    EstimateWalkTime(mph float64) time.Duration
+}
+
+var _ Pacer = Path{}   // compile-time proof that Path satisfies Pacer</code></pre>
+
+          <p><strong>Closure</strong> — a function that returns a function, capturing <code>start</code>. This is exactly the shape of the middleware in Unit 13:</p>
+          <pre><code>func timed(label string) func() {
+    start := time.Now()
+    return func() { fmt.Printf("%s took %s\n", label, time.Since(start)) }
+}
+
+func work() {
+    defer timed("work")()   // trailing (): call timed NOW, and defer the
+    // ...                   // function it RETURNS until work exits
+}</code></pre>
+        </div>
 
         <div class="callout critical">
           <span class="tag">⚠️ Spend 40 minutes on pointers, with the debugger open</span>
@@ -732,6 +854,36 @@ db, err := sql.Open("sqlite",
           </ul>
         </div>
 
+        <div class="callout concept">
+          <span class="tag">🧠 The exact syntax — the read loop</span>
+          <p>Reading many rows. The <code>&amp;</code> in <code>Scan</code> is <em>why</em> Unit 5's pointers mattered — <code>Scan</code> writes through those pointers into your struct:</p>
+          <pre><code>func (s *Store) ListPaths() ([]walk.Path, error) {
+    rows, err := s.db.Query(
+        "SELECT id, name, distance_mi, is_loop FROM paths ORDER BY name")
+    if err != nil {
+        return nil, fmt.Errorf("querying paths: %w", err)
+    }
+    defer rows.Close()
+
+    var paths []walk.Path
+    for rows.Next() {
+        var p walk.Path
+        if err := rows.Scan(&amp;p.ID, &amp;p.Name, &amp;p.DistanceMi, &amp;p.IsLoop); err != nil {
+            return nil, fmt.Errorf("scanning path: %w", err)
+        }
+        paths = append(paths, p)
+    }
+    return paths, rows.Err()   // the check everyone forgets
+}</code></pre>
+          <p>Reading one row, and turning "no such row" into a signal you can map to a 404 later:</p>
+          <pre><code>var p walk.Path
+err := s.db.QueryRow("SELECT id, name FROM paths WHERE id = ?", id).
+    Scan(&amp;p.ID, &amp;p.Name)
+if errors.Is(err, sql.ErrNoRows) {
+    return walk.Path{}, ErrNotFound
+}</code></pre>
+        </div>
+
         <p class="ends"><strong>Ends with:</strong> <code>go run .</code> prints a real path. Commit — and add <code>*.db</code>, <code>*.db-wal</code>, <code>*.db-shm</code> to <code>.gitignore</code>. 🔍 <strong>Never commit the database.</strong> It's generated, binary, and causes merge conflicts you cannot resolve.</p>
       </section>
 
@@ -787,6 +939,53 @@ db, err := sql.Open("sqlite",
             <li><strong>Why migrations exist:</strong> the schema has a <em>history</em>, and every environment must be able to replay it. This is what makes database change safe and repeatable instead of a person running commands by hand at 2am.</li>
             <li><strong>Append-only.</strong> You never edit a migration that's already run; you write a new one. Annoying for a week, then it saves you forever.</li>
           </ul>
+        </div>
+
+        <div class="callout concept">
+          <span class="tag">🧠 The exact syntax — a minimal runner</span>
+          <p>About 25 lines. Numbered files apply in order; each un-run one runs inside its own transaction and gets recorded:</p>
+          <pre><code>func migrate(db *sql.DB) error {
+    if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
+        version    TEXT PRIMARY KEY,
+        applied_at TEXT NOT NULL DEFAULT (datetime('now')))`); err != nil {
+        return err
+    }
+
+    files, err := filepath.Glob("migrations/*.sql")
+    if err != nil {
+        return err
+    }
+    sort.Strings(files)   // 001_, 002_, ... apply in filename order
+
+    for _, f := range files {
+        version := filepath.Base(f)
+
+        var seen string
+        if err := db.QueryRow(
+            "SELECT version FROM schema_migrations WHERE version = ?",
+            version).Scan(&amp;seen); err == nil {
+            continue   // already applied — skip it
+        }
+
+        stmts, err := os.ReadFile(f)
+        if err != nil {
+            return err
+        }
+        tx, err := db.Begin()
+        if err != nil {
+            return err
+        }
+        if _, err := tx.Exec(string(stmts)); err != nil {
+            tx.Rollback()               // a broken migration leaves no trace
+            return fmt.Errorf("migration %s: %w", version, err)
+        }
+        tx.Exec("INSERT INTO schema_migrations (version) VALUES (?)", version)
+        if err := tx.Commit(); err != nil {
+            return err
+        }
+    }
+    return nil
+}</code></pre>
         </div>
 
         <p class="ends"><strong>Ends with:</strong> <code>go run .</code> creates the database and applies migrations. Commit.</p>
@@ -859,6 +1058,32 @@ database</code></pre>
           </ul>
         </div>
 
+        <div class="callout concept">
+          <span class="tag">🧠 The exact syntax — interface, tags, handler</span>
+          <p>The <strong>interface</strong> the handlers depend on (and the SQLite store implements):</p>
+          <pre><code>type PathStore interface {
+    List() ([]walk.Path, error)
+    Get(id int) (walk.Path, error)
+}</code></pre>
+          <p><strong>Struct tags</strong> translate Go field names into the JSON your UI expects:</p>
+          <pre><code>type Path struct {
+    ID         int     `json:"id"`
+    Name       string  `json:"name"`
+    DistanceMi float64 `json:"distance_mi"`
+    IsLoop     bool    `json:"is_loop"`
+}</code></pre>
+          <p>A <strong>handler</strong> that depends on the interface, never on SQLite:</p>
+          <pre><code>func (s *Server) listPaths(w http.ResponseWriter, r *http.Request) {
+    paths, err := s.store.List()
+    if err != nil {
+        http.Error(w, "internal error", http.StatusInternalServerError)
+        return
+    }
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(paths)   // the tags decide the field names
+}</code></pre>
+        </div>
+
         <p class="ends"><strong>Ends with:</strong> real paths as JSON in a browser. Commit.</p>
       </section>
 
@@ -875,6 +1100,34 @@ database</code></pre>
             <li><strong>Last-inserted id</strong> — insert the parent path, get its new id, insert the child points with it.</li>
             <li><strong>A multi-statement write in one transaction</strong> — the path and its N points commit together or not at all. A path with half its points is worse than no path.</li>
           </ul>
+        </div>
+
+        <div class="callout concept">
+          <span class="tag">🧠 The exact syntax — parent + children in one transaction</span>
+          <pre><code>func (s *Store) Create(p walk.Path, points []walk.Point) (int64, error) {
+    tx, err := s.db.Begin()
+    if err != nil {
+        return 0, err
+    }
+    defer tx.Rollback()   // no-op after a successful Commit; safety net otherwise
+
+    res, err := tx.Exec(
+        "INSERT INTO paths (name, distance_mi, is_loop) VALUES (?, ?, ?)",
+        p.Name, p.DistanceMi, p.IsLoop)
+    if err != nil {
+        return 0, err
+    }
+    pathID, _ := res.LastInsertId()   // the id SQLite just assigned
+
+    for _, pt := range points {
+        if _, err := tx.Exec(
+            "INSERT INTO path_points (path_id, seq, lat, lon) VALUES (?, ?, ?, ?)",
+            pathID, pt.Seq, pt.Lat, pt.Lon); err != nil {
+            return 0, err   // the deferred Rollback undoes the path AND its points
+        }
+    }
+    return pathID, tx.Commit()
+}</code></pre>
         </div>
 
         <p>Then the delete endpoint — and the cascade you decided in Unit 3 and proved in Unit 4 does its job. If you skipped either, this is where you'd lose 90 minutes to a mystery.</p>
@@ -903,6 +1156,31 @@ database</code></pre>
           <p>A partial update must tell "set this to false" apart from "don't touch this". A plain boolean can't — but a <em>pointer</em> to a boolean can also be empty (nil). That distinction is the whole reason the type exists.</p>
         </div>
 
+        <div class="callout concept">
+          <span class="tag">🧠 The exact syntax — nil means "leave it alone"</span>
+          <p>Pointer fields let the JSON decoder tell "absent" from "present and false". You then build the <code>SET</code> clause only from the fields that actually arrived:</p>
+          <pre><code>type PathPatch struct {
+    Name   *string `json:"name"`     // nil if the client omitted it
+    IsLoop *bool   `json:"is_loop"`
+}
+
+func buildUpdate(id int, patch PathPatch) (string, []any) {
+    var sets []string
+    var args []any
+    if patch.Name != nil {
+        sets = append(sets, "name = ?")
+        args = append(args, *patch.Name)
+    }
+    if patch.IsLoop != nil {
+        sets = append(sets, "is_loop = ?")
+        args = append(args, *patch.IsLoop)
+    }
+    args = append(args, id)
+    // column names are OURS (safe to concatenate); values stay parameterised (?)
+    return "UPDATE paths SET " + strings.Join(sets, ", ") + " WHERE id = ?", args
+}</code></pre>
+        </div>
+
         <div class="callout critical">
           <span class="tag">⚠️ Don't skim past this — one subtle SQL rule</span>
           <p>Building a partial update means assembling SQL from whichever fields were provided — which brushes against the Unit 6 rule "never build SQL from strings." The reconciliation: <strong>interpolating column names you control is fine; interpolating values you don't control is an injection.</strong> Talk it through until it's obvious.</p>
@@ -929,6 +1207,31 @@ database</code></pre>
           <p><strong>Log the detail, return the category.</strong> The user gets "not found"; your log gets the stack trace. And middleware being "just a function returning a function" is where Unit 5's closures earn their keep.</p>
         </div>
 
+        <div class="callout concept">
+          <span class="tag">🧠 The exact syntax — validation and a middleware</span>
+          <p>Validation returns a plain error the handler turns into a 400:</p>
+          <pre><code>func validatePath(p walk.Path) error {
+    if strings.TrimSpace(p.Name) == "" {
+        return errors.New("name is required")
+    }
+    if p.DistanceMi &lt; 0 {
+        return errors.New("distance cannot be negative")
+    }
+    if p.Lat &lt; -90 || p.Lat &gt; 90 {
+        return errors.New("latitude out of range")
+    }
+    return nil
+}</code></pre>
+          <p>Middleware <em>is</em> Unit 5's closure — a function that wraps a handler and returns a handler:</p>
+          <pre><code>func logRequests(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        start := time.Now()
+        next.ServeHTTP(w, r)   // run the real handler
+        log.Printf("%s %s  %s", r.Method, r.URL.Path, time.Since(start))
+    })
+}</code></pre>
+        </div>
+
         <p class="ends"><strong>Ends with:</strong> it survives the curl abuse from Unit 11. Commit.</p>
       </section>
 
@@ -944,6 +1247,30 @@ database</code></pre>
           <li><strong>Store tests against a temp database</strong> — and this is why the migration runner was made a function back in Unit 8.</li>
           <li><strong>The race detector</strong> — run the tests with race detection on. Meet it now, so it's familiar before the weather cache needs it.</li>
         </ol>
+
+        <div class="callout concept">
+          <span class="tag">🧠 The exact syntax — a table-driven test</span>
+          <p>One <code>cases</code> slice, one loop, a named subtest per row. Run with <code>go test ./...</code> (add <code>-race</code> for the detector):</p>
+          <pre><code>func TestValidatePath(t *testing.T) {
+    cases := []struct {
+        name    string
+        path    walk.Path
+        wantErr bool
+    }{
+        {"ok",         walk.Path{Name: "Loop", DistanceMi: 2},  false},
+        {"empty name", walk.Path{Name: "",     DistanceMi: 2},  true},
+        {"negative",   walk.Path{Name: "Loop", DistanceMi: -1}, true},
+    }
+    for _, tc := range cases {
+        t.Run(tc.name, func(t *testing.T) {
+            err := validatePath(tc.path)
+            if (err != nil) != tc.wantErr {
+                t.Errorf("got err=%v, wantErr=%v", err, tc.wantErr)
+            }
+        })
+    }
+}</code></pre>
+        </div>
 
         <div class="callout try">
           <span class="tag">✅ Manufacture a merge conflict on purpose</span>
@@ -1020,6 +1347,29 @@ cd web && npm install && npm run dev</code></pre>
           <p>click → fetch → handler → SQL → row → JSON → state → pixels. When something breaks later, debugging <em>is</em> walking this path and asking where it stopped. Watch the real request and response in the browser's network panel — that's where most frontend bugs die.</p>
         </div>
 
+        <div class="callout concept">
+          <span class="tag">🧠 The exact syntax — fetch into state, and the dev proxy</span>
+          <p>Load the list once when the component mounts, with the three states a real UI needs:</p>
+          <pre><code>const [paths, setPaths] = useState&lt;Path[]&gt;([])
+const [error, setError] = useState&lt;string | null&gt;(null)
+const [loading, setLoading] = useState(true)
+
+useEffect(() =&gt; {
+  fetch("/api/paths")
+    .then(r =&gt; {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      return r.json()
+    })
+    .then(setPaths)
+    .catch(e =&gt; setError(String(e)))
+    .finally(() =&gt; setLoading(false))
+}, [])   // [] = run once, on first mount</code></pre>
+          <p>The dev proxy, in <code>vite.config.ts</code>, so <code>/api</code> reaches your Go server:</p>
+          <pre><code>server: {
+  proxy: { "/api": "http://localhost:8080" },
+}</code></pre>
+        </div>
+
         <p class="ends"><strong>Ends with:</strong> paths on screen, creatable from the browser. Commit. 🎁</p>
       </section>
 
@@ -1080,6 +1430,55 @@ cd web && npm install && npm run dev</code></pre>
           </ul>
         </div>
 
+        <div class="callout concept">
+          <span class="tag">🧠 The exact syntax — client with a timeout, and a locked cache</span>
+          <p>A package-level client with a timeout, and a struct for only the fields you want:</p>
+          <pre><code>var client = &amp;http.Client{Timeout: 5 * time.Second}   // default client has NONE
+
+type forecast struct {          // fields you skip are simply ignored
+    Hourly struct {
+        Temperature  []float64 `json:"temperature_2m"`
+        PrecipChance []int     `json:"precipitation_probability"`
+    } `json:"hourly"`
+}
+
+func fetchForecast(ctx context.Context, lat, lon float64) (forecast, error) {
+    url := fmt.Sprintf(
+        "https://api.open-meteo.com/v1/forecast?latitude=%f&amp;longitude=%f"+
+            "&amp;hourly=temperature_2m&amp;temperature_unit=fahrenheit&amp;timezone=auto",
+        lat, lon)
+    req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
+    resp, err := client.Do(req)
+    if err != nil {
+        return forecast{}, err
+    }
+    defer resp.Body.Close()
+
+    var f forecast
+    return f, json.NewDecoder(resp.Body).Decode(&amp;f)
+}</code></pre>
+          <p>The cache is shared across concurrent handlers, so a <code>sync.Mutex</code> guards it:</p>
+          <pre><code>type weatherCache struct {
+    mu   sync.Mutex
+    at   time.Time
+    data forecast
+}
+
+func (c *weatherCache) get(ctx context.Context, lat, lon float64) (forecast, error) {
+    c.mu.Lock()
+    defer c.mu.Unlock()
+    if time.Since(c.at) &lt; 15*time.Minute {
+        return c.data, nil   // fresh enough — no network call
+    }
+    f, err := fetchForecast(ctx, lat, lon)
+    if err != nil {
+        return c.data, err   // degrade: hand back the last good value
+    }
+    c.data, c.at = f, time.Now()
+    return f, nil
+}</code></pre>
+        </div>
+
         <p class="ends"><strong>Ends with:</strong> a weather endpoint, race-free. Commit.</p>
       </section>
 
@@ -1104,6 +1503,30 @@ Output: paths, ranked, each with a reason</code></pre>
             <li><strong>Business logic as its own layer</strong> — testable with no database and no server. This is where Unit 10's layering pays a visible dividend: you can test the whole engine with plain values.</li>
             <li><strong>Tuning is guessing, then adjusting.</strong> How do you decide shade is worth 3 and distance-fit is worth 5? You don't, really. You guess, use it, and adjust. Getting comfortable with that <em>is</em> the lesson.</li>
           </ul>
+        </div>
+
+        <div class="callout concept">
+          <span class="tag">🧠 The exact syntax — one scoring pass</span>
+          <p>Each rule adds points and, when it fires, a human-readable reason. Return both:</p>
+          <pre><code>func score(p walk.Path, req Request, w forecast) (int, []string) {
+    points := 0
+    var reasons []string
+
+    if w.isHot() &amp;&amp; p.HasTag("shaded") {
+        points += 3
+        reasons = append(reasons, fmt.Sprintf("shaded, and it's %.0f°", w.tempNow()))
+    }
+    if req.Mood == "quick" &amp;&amp; p.DistanceMi &lt;= req.milesFor(req.Minutes) {
+        points += 5
+        reasons = append(reasons, "fits the time you have")
+    }
+    if p.WalkedWithin(24 * time.Hour) {
+        points -= 2
+        reasons = append(reasons, "walked recently — mixing it up")
+    }
+    return points, reasons
+}</code></pre>
+          <p>Then rank: score every path, sort by points descending, return the top few with their reasons attached.</p>
         </div>
 
         <div class="callout decision">
@@ -1192,6 +1615,29 @@ go build</code></pre>
         <div class="grid2">
           <div class="mini"><h4>What you push up</h4><p>The single binary (or a tiny container that just copies it in and runs it). No Node, no runtime, no dependencies to install on the server.</p></div>
           <div class="mini"><h4>What the host gives you</h4><p>A URL like <code>walkapp.fly.dev</code>, automatic HTTPS, and a persistent volume where <code>walk.db</code> lives.</p></div>
+        </div>
+
+        <div class="callout concept">
+          <span class="tag">🧠 The exact syntax — a Dockerfile and the deploy</span>
+          <p>A two-stage build: compile the UI and the binary, then ship <em>only</em> the binary on a tiny base image:</p>
+          <pre><code># --- build stage ---
+FROM golang:1.26 AS build
+WORKDIR /src
+COPY . .
+RUN cd web && npm ci && npm run build   # UI first (embed reads web/dist)
+RUN go build -o /walkapp .
+
+# --- run stage ---
+FROM debian:stable-slim
+COPY --from=build /walkapp /walkapp
+ENV WALK_DB=/data/walk.db     # point the DB at the mounted volume
+EXPOSE 8080
+CMD ["/walkapp"]</code></pre>
+          <p>Then, with Fly.io, three commands — the volume is the step you must not skip:</p>
+          <pre><code>fly launch --no-deploy          # writes fly.toml
+fly volumes create walkdata --size 1
+# mount that volume at /data in fly.toml, then:
+fly deploy</code></pre>
         </div>
 
         <div class="callout critical">
